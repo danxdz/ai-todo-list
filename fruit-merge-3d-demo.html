@@ -6,22 +6,45 @@
   <title>3D fruit merge — minimal demo</title>
   <style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1d24; font-family: system-ui, sans-serif; }
-    #ui {
-      position: fixed; left: 12px; top: 12px; z-index: 1;
-      color: #e8eaef; font-size: 14px; line-height: 1.5; max-width: 320px;
-      text-shadow: 0 1px 2px #000a;
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+    #hud {
+      position: fixed; left: 12px; top: 10px; z-index: 2;
+      color: #eee; font-size: 14px; line-height: 1.45; max-width: 280px;
+      text-shadow: 0 1px 3px #000;
     }
-    #ui kbd { background: #333; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-    canvas { display: block; width: 100%; height: 100%; }
+    #hud strong { color: #fff; }
+    #hud kbd { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    #overlay {
+      display: none; position: fixed; inset: 0; z-index: 3;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.72); color: #fff; font-size: clamp(18px, 4vw, 28px);
+      text-align: center; padding: 24px; pointer-events: none;
+    }
+    #overlay.visible { display: flex; flex-direction: column; gap: 12px; }
+    #help {
+      position: fixed; right: 10px; bottom: 10px; z-index: 2;
+      color: #888; font-size: 12px; max-width: 220px; text-align: right;
+      line-height: 1.35;
+    }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   </style>
 </head>
 <body>
-  <div id="ui">
-    <strong>3D merge demo</strong><br />
-    Move pointer: preview next drop · Left click / tap: drop<br />
-    Narrow lane (2D-style): aim along one row · Same size merges up<br />
-    Right-drag: orbit · Scroll: zoom · <kbd>R</kbd> reset
+  <div id="hud">
+    <strong>Score</strong> <span id="scoreVal">0</span><br />
+    <strong>Level</strong> <span id="levelVal">1</span>
+    <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
+    <span style="font-size:12px;opacity:.85">Preview: solid ball · lane locked on Z</span>
+  </div>
+  <div id="overlay">
+    <div id="overlayTitle">Game over</div>
+    <div id="overlaySub" style="font-size:55%;opacity:.9">Something crossed the red line</div>
+    <div style="font-size:45%;opacity:.75;margin-top:8px">Press <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> to restart</div>
+  </div>
+  <div id="help">
+    Left click: drop · Right-drag: orbit<br />
+    Merge = points · Level every goal pts<br />
+    <kbd>R</kbd> reset
   </div>
 
   <script type="importmap">
@@ -39,29 +62,69 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import * as CANNON from 'cannon-es';
 
-    // --- Tunables
-    /** halfZ just wider than largest fruit radius so balls stay in one “row” (2D in 3D) */
-    const CUP = { halfX: 1.65, halfZ: 0.62, wallH: 5, wallT: 0.15 };
     const ROW_Z = 0;
-    const FRUIT_MASS_BASE = 6;
-    const FRUIT_MASS_PER_TIER = 0.9;
+    const FRUIT_MASS_BASE = 5.5;
+    const FRUIT_MASS_PER_TIER = 0.85;
+
     const FRUITS = [
-      { radius: 0.22, color: 0xff6b9d },
-      { radius: 0.28, color: 0xff9f43 },
-      { radius: 0.36, color: 0xfeca57 },
-      { radius: 0.46, color: 0x5f27cd },
-      { radius: 0.58, color: 0x00d2d3 },
+      { radius: 0.2, color: 0xff6b9d },
+      { radius: 0.26, color: 0xff9f43 },
+      { radius: 0.34, color: 0xfeca57 },
+      { radius: 0.44, color: 0x5f27cd },
+      { radius: 0.56, color: 0x1abc9c },
+      { radius: 0.7, color: 0x2ecc71 },
+      { radius: 0.86, color: 0xe74c3c },
     ];
-    /** Highest tier that can still pair (two of this merge to tier + 1) */
     const MERGEABLE_TYPE_MAX = FRUITS.length - 2;
+    const MAX_RADIUS = FRUITS[FRUITS.length - 1].radius;
+
+    /** Points when two of `type` merge into `type+1` */
+    const MERGE_POINTS = FRUITS.map((_, i) => (i + 1) * 15);
+
+    const CUP_BASE = {
+      halfX: 2.05,
+      get halfZ() {
+        return Math.max(0.52, MAX_RADIUS + 0.08);
+      },
+      wallT: 0.14,
+    };
+
+    let CUP = { ...CUP_BASE, wallH: 11 };
+    let DROP_CENTER_Y = CUP.wallH - 0.55;
+    let GAME_OVER_Y = CUP.wallH - 0.32;
+
+    const scoreEl = document.getElementById('scoreVal');
+    const levelEl = document.getElementById('levelVal');
+    const nextLvlEl = document.getElementById('nextLvlVal');
+    const overlay = document.getElementById('overlay');
+
+    let score = 0;
+    let level = 1;
+    let levelScoreGoal = 200;
+    let gameOver = false;
+
+    function syncHud() {
+      scoreEl.textContent = String(score);
+      levelEl.textContent = String(level);
+      nextLvlEl.textContent = String(levelScoreGoal);
+    }
+
+    function addScore(delta) {
+      score += delta;
+      while (score >= levelScoreGoal) {
+        score -= levelScoreGoal;
+        level += 1;
+        levelScoreGoal = Math.floor(levelScoreGoal * 1.25 + 50);
+      }
+      syncHud();
+    }
 
     // --- Three
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x2c3038);
-    scene.fog = new THREE.Fog(0x2c3038, 12, 28);
+    scene.background = new THREE.Color(0x050508);
+    scene.fog = new THREE.Fog(0x050508, 25, 55);
 
-    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
-    camera.position.set(0, 6.2, 11.5);
+    const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.08, 120);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -71,85 +134,134 @@
     document.body.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1.2, 0);
     controls.enableDamping = true;
-    controls.maxPolarAngle = Math.PI * 0.48;
-    // Left click / tap = drop fruit; orbit with right-drag (middle = zoom)
+    controls.maxPolarAngle = Math.PI * 0.49;
     controls.mouseButtons.LEFT = undefined;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
-    // One-finger touch = ghost move + tap drop (no orbit steal)
     controls.touches.ONE = undefined;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.95);
-    sun.position.set(4, 10, 6);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.92);
+    sun.position.set(3.5, 14, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 24;
-    sun.shadow.camera.left = -8;
-    sun.shadow.camera.right = 8;
-    sun.shadow.camera.top = 8;
-    sun.shadow.camera.bottom = -2;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 40;
+    sun.shadow.camera.left = -10;
+    sun.shadow.camera.right = 10;
+    sun.shadow.camera.top = 12;
+    sun.shadow.camera.bottom = -4;
     scene.add(sun);
 
-    // Cup visuals: rim + edges only (avoids stacked transmission “double glass”)
     const rimMat = new THREE.MeshStandardMaterial({
-      color: 0x8ab4e8,
-      metalness: 0.25,
-      roughness: 0.35,
-      transparent: true,
-      opacity: 0.88,
+      color: 0x0a0a0a,
+      metalness: 0.15,
+      roughness: 0.55,
     });
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x3d4a5c,
-      metalness: 0.05,
-      roughness: 0.85,
+      color: 0x0d0d0d,
+      metalness: 0.08,
+      roughness: 0.92,
     });
-    const floorGeo = new THREE.PlaneGeometry(CUP.halfX * 2 + 0.2, CUP.halfZ * 2 + 0.2);
-    const floorVis = new THREE.Mesh(floorGeo, floorMat);
-    floorVis.rotation.x = -Math.PI / 2;
-    floorVis.position.y = 0.002;
-    floorVis.receiveShadow = true;
-    scene.add(floorVis);
 
-    const edgeT = 0.06;
-    const wh = CUP.wallH;
-    function addEdgeBox(w, h, d, x, y, z) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rimMat);
-      m.position.set(x, y, z);
-      m.castShadow = true;
-      m.receiveShadow = true;
-      scene.add(m);
-    }
-    // Top rim
-    addEdgeBox(CUP.halfX * 2 + edgeT * 2, edgeT, edgeT, 0, wh, -CUP.halfZ - edgeT / 2);
-    addEdgeBox(CUP.halfX * 2 + edgeT * 2, edgeT, edgeT, 0, wh,  CUP.halfZ + edgeT / 2);
-    addEdgeBox(edgeT, edgeT, CUP.halfZ * 2 + edgeT * 2, -CUP.halfX - edgeT / 2, wh, 0);
-    addEdgeBox(edgeT, edgeT, CUP.halfZ * 2 + edgeT * 2,  CUP.halfX + edgeT / 2, wh, 0);
-    // Vertical corner posts (thin)
-    const postY = wh / 2;
-    function post(x, z) {
-      addEdgeBox(edgeT, wh, edgeT, x, postY, z);
-    }
-    post(-CUP.halfX, -CUP.halfZ);
-    post( CUP.halfX, -CUP.halfZ);
-    post(-CUP.halfX,  CUP.halfZ);
-    post( CUP.halfX,  CUP.halfZ);
+    const cupGroup = new THREE.Group();
+    scene.add(cupGroup);
 
-    // --- Cannon world
-    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -18, 0) });
+    let floorVis = null;
+    let dangerLine = null;
+    const edgeMeshes = [];
+
+    const staticBodies = [];
+
+    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -22, 0) });
     world.allowSleep = true;
-    world.defaultContactMaterial.friction = 0.35;
-    world.defaultContactMaterial.restitution = 0.08;
+    world.defaultContactMaterial.friction = 0.42;
+    world.defaultContactMaterial.restitution = 0.03;
 
     const physicsMaterial = new CANNON.Material('fruit');
     const fruitContact = new CANNON.ContactMaterial(physicsMaterial, physicsMaterial, {
-      friction: 0.18,
-      restitution: 0.18,
+      friction: 0.32,
+      restitution: 0.05,
     });
     world.addContactMaterial(fruitContact);
+
+    function clearCupVisuals() {
+      while (cupGroup.children.length) {
+        const o = cupGroup.children.pop();
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose?.();
+      }
+      edgeMeshes.length = 0;
+      floorVis = null;
+      dangerLine = null;
+    }
+
+    function buildCupVisuals() {
+      clearCupVisuals();
+      const wh = CUP.wallH;
+      const hx = CUP.halfX;
+      const hz = CUP.halfZ;
+      const edgeT = 0.055;
+
+      const floorGeo = new THREE.PlaneGeometry(hx * 2 + 0.25, hz * 2 + 0.25);
+      floorVis = new THREE.Mesh(floorGeo, floorMat);
+      floorVis.rotation.x = -Math.PI / 2;
+      floorVis.position.y = 0.002;
+      floorVis.receiveShadow = true;
+      cupGroup.add(floorVis);
+
+      function addEdgeBox(w, h, d, x, y, z) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rimMat);
+        m.position.set(x, y, z);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        cupGroup.add(m);
+        edgeMeshes.push(m);
+      }
+      addEdgeBox(hx * 2 + edgeT * 2, edgeT, edgeT, 0, wh, -hz - edgeT / 2);
+      addEdgeBox(hx * 2 + edgeT * 2, edgeT, edgeT, 0, wh,  hz + edgeT / 2);
+      addEdgeBox(edgeT, edgeT, hz * 2 + edgeT * 2, -hx - edgeT / 2, wh, 0);
+      addEdgeBox(edgeT, edgeT, hz * 2 + edgeT * 2,  hx + edgeT / 2, wh, 0);
+      const postY = wh / 2;
+      function post(x, z) {
+        addEdgeBox(edgeT, wh, edgeT, x, postY, z);
+      }
+      post(-hx, -hz);
+      post( hx, -hz);
+      post(-hx,  hz);
+      post( hx,  hz);
+
+      const lineMat = new THREE.MeshBasicMaterial({
+        color: 0xff3355,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      });
+      const lineGeo = new THREE.PlaneGeometry(hx * 2 - 0.06, 0.06);
+      dangerLine = new THREE.Mesh(lineGeo, lineMat);
+      dangerLine.rotation.x = -Math.PI / 2;
+      dangerLine.position.set(0, GAME_OVER_Y + 0.01, ROW_Z);
+      cupGroup.add(dangerLine);
+    }
+
+    function clearStaticPhysics() {
+      for (const b of staticBodies) world.removeBody(b);
+      staticBodies.length = 0;
+    }
+
+    function buildStaticPhysics() {
+      clearStaticPhysics();
+      const hx = CUP.halfX;
+      const hz = CUP.halfZ;
+      const wt = CUP.wallT;
+      const wh = CUP.wallH;
+      addStaticBox(hx + wt, 0.05, hz + wt, 0, -0.05, 0);
+      addStaticBox(wt / 2, wh / 2, hz + wt, -hx - wt / 2, wh / 2, 0);
+      addStaticBox(wt / 2, wh / 2, hz + wt,  hx + wt / 2, wh / 2, 0);
+      addStaticBox(hx, wh / 2, wt / 2, 0, wh / 2, -hz - wt / 2);
+      addStaticBox(hx, wh / 2, wt / 2, 0, wh / 2,  hz + wt / 2);
+    }
 
     function addStaticBox(hx, hy, hz, x, y, z) {
       const shape = new CANNON.Box(new CANNON.Vec3(hx, hy, hz));
@@ -157,26 +269,75 @@
       body.addShape(shape);
       body.position.set(x, y, z);
       world.addBody(body);
+      staticBodies.push(body);
     }
-    // Floor + walls (aligned with visual cup)
-    addStaticBox(CUP.halfX + CUP.wallT, 0.05, CUP.halfZ + CUP.wallT, 0, -0.05, 0);
-    addStaticBox(CUP.wallT / 2, CUP.wallH / 2, CUP.halfZ + CUP.wallT, -CUP.halfX - CUP.wallT / 2, CUP.wallH / 2, 0);
-    addStaticBox(CUP.wallT / 2, CUP.wallH / 2, CUP.halfZ + CUP.wallT,  CUP.halfX + CUP.wallT / 2, CUP.wallH / 2, 0);
-    addStaticBox(CUP.halfX, CUP.wallH / 2, CUP.wallT / 2, 0, CUP.wallH / 2, -CUP.halfZ - CUP.wallT / 2);
-    addStaticBox(CUP.halfX, CUP.wallH / 2, CUP.wallT / 2, 0, CUP.wallH / 2,  CUP.halfZ + CUP.wallT / 2);
+
+    /** Max |x| for sphere center so it stays inside inner walls */
+    function innerHalfXForRadius(radius) {
+      const innerFace = CUP.halfX - CUP.wallT;
+      const pad = 0.04;
+      return Math.max(0.05, innerFace - radius - pad);
+    }
+
+    function clampDropXZ(x, _z, radius) {
+      const lim = innerHalfXForRadius(radius);
+      return {
+        x: Math.max(-lim, Math.min(lim, x)),
+        z: ROW_Z,
+      };
+    }
+
+    function computeCupHeightForViewport() {
+      const minH = 9;
+      const maxH = 18;
+      const t = Math.min(1, innerHeight / 900);
+      return minH + (maxH - minH) * t;
+    }
+
+    function fitCameraToCup() {
+      const wh = CUP.wallH;
+      const hx = CUP.halfX;
+      const hz = CUP.halfZ;
+      const box = new THREE.Box3(
+        new THREE.Vector3(-hx - 0.35, -0.3, -hz - 0.35),
+        new THREE.Vector3( hx + 0.35, Math.max(wh, DROP_CENTER_Y) + 0.5, hz + 0.35),
+      );
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const aspect = Math.max(0.5, innerWidth / innerHeight);
+      const fov = camera.fov * (Math.PI / 180);
+      const fitHeightDistance = size.y / (2 * Math.tan(fov / 2));
+      const fitWidthDistance = size.x / (2 * Math.tan(fov / 2) * aspect);
+      let dist = Math.max(fitHeightDistance, fitWidthDistance) * 1.06 + hz * 1.2;
+      dist = Math.min(Math.max(dist, 8), 28);
+      camera.position.set(center.x, center.y + size.y * 0.06, center.z + dist);
+      controls.target.copy(center);
+      camera.near = Math.max(0.05, dist / 200);
+      camera.far = dist * 4;
+      camera.updateProjectionMatrix();
+    }
+
+    function applyCupLayout() {
+      CUP.wallH = computeCupHeightForViewport();
+      DROP_CENTER_Y = CUP.wallH - 0.55;
+      GAME_OVER_Y = CUP.wallH - 0.38;
+      buildCupVisuals();
+      buildStaticPhysics();
+      fitCameraToCup();
+      if (dangerLine) dangerLine.position.y = GAME_OVER_Y + 0.012;
+    }
+
+    applyCupLayout();
 
     const raycaster = new THREE.Raycaster();
     const dropPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const planeHit = new THREE.Vector3();
-    const DROP_CENTER_Y = CUP.wallH - 0.5;
 
     /** @type {{ mesh: THREE.Mesh, body: CANNON.Body, type: number }[]} */
     let fruits = [];
-    /** Clicks alternate the two smallest tiers (Suika-style queue) */
     let nextType = 0;
     let mergeCooldown = 0;
 
-    /** Ghost sphere: no physics, follows pointer */
     let ghostMesh = null;
     let ghostVisualType = -1;
     const ghostPos = new THREE.Vector3(0, DROP_CENTER_Y, 0);
@@ -199,28 +360,19 @@
       const geo = new THREE.SphereGeometry(spec.radius, 28, 20);
       const mat = new THREE.MeshStandardMaterial({
         color: spec.color,
-        roughness: 0.35,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 0.5,
-        depthWrite: false,
+        roughness: 0.32,
+        metalness: 0.12,
+        emissive: spec.color,
+        emissiveIntensity: 0.08,
       });
       ghostMesh = new THREE.Mesh(geo, mat);
-      ghostMesh.renderOrder = 1;
+      ghostMesh.renderOrder = 2;
       scene.add(ghostMesh);
       ghostVisualType = type;
     }
 
     function pendingDropType() {
       return nextType % 2;
-    }
-
-    function clampDropXZ(x, _z, radius) {
-      const m = Math.max(radius * 0.85, 0.05);
-      return {
-        x: Math.max(-CUP.halfX + m, Math.min(CUP.halfX - m, x)),
-        z: ROW_Z,
-      };
     }
 
     function updateGhostAt(clientX, clientY) {
@@ -240,10 +392,11 @@
 
     function spawnFruit(type, x, y, z) {
       const spec = FRUITS[type];
+      const cx = clampDropXZ(x, z, spec.radius).x;
       const geo = new THREE.SphereGeometry(spec.radius, 32, 24);
       const mat = new THREE.MeshStandardMaterial({
         color: spec.color,
-        roughness: 0.35,
+        roughness: 0.34,
         metalness: 0.1,
       });
       const mesh = new THREE.Mesh(geo, mat);
@@ -254,14 +407,14 @@
       const shape = new CANNON.Sphere(spec.radius);
       const body = new CANNON.Body({
         mass: FRUIT_MASS_BASE + type * FRUIT_MASS_PER_TIER,
-        linearDamping: 0.03,
-        angularDamping: 0.18,
+        linearDamping: 0.12,
+        angularDamping: 0.45,
         material: physicsMaterial,
       });
       body.addShape(shape);
-      body.position.set(x, y, ROW_Z);
-      body.sleepSpeedLimit = 0.35;
-      body.sleepTimeLimit = 0.4;
+      body.position.set(cx, y, ROW_Z);
+      body.sleepSpeedLimit = 0.28;
+      body.sleepTimeLimit = 0.55;
       body.fruitType = type;
       world.addBody(body);
 
@@ -279,7 +432,7 @@
     }
 
     function tryMerge() {
-      if (mergeCooldown > 0) return;
+      if (mergeCooldown > 0 || gameOver) return;
       const dynamics = fruits.filter((f) => f.type <= MERGEABLE_TYPE_MAX);
       for (let i = 0; i < dynamics.length; i++) {
         for (let j = i + 1; j < dynamics.length; j++) {
@@ -288,45 +441,71 @@
           if (a.type !== b.type) continue;
           const ra = FRUITS[a.type].radius;
           const rb = FRUITS[b.type].radius;
-          // Touching spheres have center distance ≈ ra + rb. A factor < 1 required huge
-          // overlap that the solver rarely keeps, so merges never fired. Use > 1 slack.
           const touch = ra + rb;
           const dist = a.body.position.distanceTo(b.body.position);
-          const mergeDist = touch * 1.12;
+          const mergeDist = touch * 1.1;
           if (dist > mergeDist) continue;
 
           const nx = (a.body.position.x + b.body.position.x) / 2;
           const ny = (a.body.position.y + b.body.position.y) / 2;
-          const nz = ROW_Z;
           const newType = a.type + 1;
           const rNew = FRUITS[newType].radius;
-          const nyLifted = Math.max(rNew * 0.5, ny);
+          const lim = innerHalfXForRadius(rNew);
+          const cx = Math.max(-lim, Math.min(lim, nx));
+          const nyLifted = Math.max(rNew * 0.45, ny);
 
           removeFruit(a);
           removeFruit(b);
-          spawnFruit(newType, nx, nyLifted, nz);
-          // Nudge awake
-          mergeCooldown = 8;
+          spawnFruit(newType, cx, nyLifted, ROW_Z);
+          const merged = fruits[fruits.length - 1];
+          merged.body.velocity.scale(0.35, merged.body.velocity);
+          merged.body.angularVelocity.scale(0.4, merged.body.angularVelocity);
+
+          const pts = MERGE_POINTS[a.type] ?? 20;
+          addScore(pts);
+
+          mergeCooldown = 10;
           return;
         }
       }
     }
 
-    function reset() {
+    function checkGameOver() {
+      if (gameOver) return;
+      for (const f of fruits) {
+        const r = FRUITS[f.type].radius;
+        if (f.body.position.y + r >= GAME_OVER_Y) {
+          gameOver = true;
+          overlay.classList.add('visible');
+          return;
+        }
+      }
+    }
+
+    function fullReset() {
       fruits.slice().forEach(removeFruit);
       nextType = 0;
       mergeCooldown = 0;
+      score = 0;
+      level = 1;
+      levelScoreGoal = 200;
+      gameOver = false;
+      overlay.classList.remove('visible');
+      syncHud();
+      applyCupLayout();
       ensureGhostForType(pendingDropType());
+      ghostPos.y = DROP_CENTER_Y;
     }
 
     function dropNext() {
+      if (gameOver) return;
       const t = pendingDropType();
       nextType++;
       const spec = FRUITS[t];
       const c = clampDropXZ(ghostPos.x, ghostPos.z, spec.radius);
       spawnFruit(t, c.x, DROP_CENTER_Y, ROW_Z);
       const last = fruits[fruits.length - 1];
-      last.body.velocity.set(0, -0.5, 0);
+      last.body.velocity.set(0, -0.35, 0);
       ensureGhostForType(pendingDropType());
     }
 
@@ -342,13 +521,14 @@
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'r' || e.key === 'R') reset();
+      if (e.key === 'r' || e.key === 'R') fullReset();
     });
 
     window.addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
-      camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
+      applyCupLayout();
+      updateGhostAt(innerWidth / 2, innerHeight / 2);
     });
 
     const clock = new THREE.Clock();
@@ -360,25 +540,39 @@
       const dt = Math.min(clock.getDelta(), 0.05);
       controls.update();
 
-      acc += dt;
-      while (acc >= fixed) {
-        world.step(fixed);
-        acc -= fixed;
+      if (!gameOver) {
+        acc += dt;
+        while (acc >= fixed) {
+          world.step(fixed);
+          acc -= fixed;
+        }
       }
       if (mergeCooldown > 0) mergeCooldown--;
 
       for (const f of fruits) {
         f.body.position.z = ROW_Z;
         f.body.velocity.z = 0;
+        const r = FRUITS[f.type].radius;
+        const lim = innerHalfXForRadius(r);
+        const x = f.body.position.x;
+        if (x > lim) {
+          f.body.position.x = lim;
+          f.body.velocity.x *= -0.15;
+        } else if (x < -lim) {
+          f.body.position.x = -lim;
+          f.body.velocity.x *= -0.15;
+        }
         f.mesh.position.copy(f.body.position);
         f.mesh.quaternion.copy(f.body.quaternion);
       }
 
       tryMerge();
+      checkGameOver();
 
       renderer.render(scene, camera);
     }
 
+    syncHud();
     ensureGhostForType(pendingDropType());
     updateGhostAt(innerWidth / 2, innerHeight / 2);
 

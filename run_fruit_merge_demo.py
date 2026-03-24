@@ -71,7 +71,7 @@ def main() -> int:
     # (we actually open before serve_forever, but threading is still nicer for multiple tabs)
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
 
-    url = f"http://{args.host}:{args.port}/fruit-merge-3d-demo.html?v=9"
+    url = f"http://{args.host}:{args.port}/fruit-merge-3d-demo.html?v=10"
     print(f"Serving {root}")
     print(f"Open: {url}")
     print("Press Ctrl+C to stop.")

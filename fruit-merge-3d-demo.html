@@ -39,7 +39,7 @@
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
-    <span style="font-size:12px;opacity:.85">Build <span id="buildId">v9</span> · <kbd>F</kbd> fullscreen</span>
+    <span style="font-size:12px;opacity:.85">Build <span id="buildId">v10</span> · <kbd>F</kbd> fullscreen</span>
   </div>
   <div id="overlay">
     <div id="overlayTitle">Game over</div>
@@ -48,7 +48,7 @@
   </div>
   <div id="help">
     Move / click: aim & drop<br />
-    Merge = points · <kbd>R</kbd> reset · <kbd>F</kbd> fullscreen
+    Drop +2 · merge more · <kbd>R</kbd> reset · <kbd>F</kbd> fullscreen
   </div>
 
   <!-- Local vendor/ so the game works offline and when CDN DNS fails (ERR_NAME_NOT_RESOLVED) -->
@@ -66,6 +66,8 @@
     import * as CANNON from 'cannon-es';
 
     const ROW_Z = 0;
+    /** Ghost / spawn slightly toward camera so it is not hidden behind the back panel */
+    const GHOST_Z = ROW_Z + 0.42;
     const FRUIT_MASS_BASE = 5.5;
     const FRUIT_MASS_PER_TIER = 0.85;
 
@@ -108,11 +110,8 @@
     let levelScoreGoal = 200;
     let gameOver = false;
 
-    /** One drop at a time until the last spawn clears the drop band (stops overlap pops → false game over). */
-    let dropAllowed = true;
-    /** @type {CANNON.Body | null} */
-    let lastDroppedBody = null;
-    let dropLockCalmSec = 0;
+    let lastDropTime = 0;
+    const DROP_COOLDOWN_MS = 420;
 
     /** Require pile above line for this long (seconds) — ignores one-frame physics spikes */
     let gameOverDwell = 0;
@@ -125,6 +124,7 @@
     }
 
     function addScore(delta) {
+      if (delta <= 0) return;
       score += delta;
       while (score >= levelScoreGoal) {
         score -= levelScoreGoal;
@@ -319,53 +319,34 @@
       return minH + (maxH - minH) * t;
     }
 
-    /**
-     * Ortho frustum MUST satisfy (right-left)/(top-bottom) = canvas width/height or the
-     * scene squishes into a thin vertical strip. Never cap halfW without recomputing viewH.
-     */
     function fitCameraToCup() {
       const wh = CUP.wallH;
-      const hx = CUP.halfX + CUP.wallT + 0.32;
-      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.65;
-      const floorY = 0;
+      const hx = CUP.halfX + CUP.wallT + 0.35;
+      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.85;
       const aspect = Math.max(0.28, innerWidth / innerHeight);
-      const minHalfW = hx * 1.08;
+      const minHalfW = hx * 1.1;
 
-      const contentSpan = Math.max(6.5, playTop - floorY);
-      const topPad = 0.6;
-      const bottomFrac = 0.18;
-      const minViewH = (contentSpan + topPad) / (1 - bottomFrac);
-
-      let viewH = minViewH;
+      const yLow = -2.35;
+      const yHigh = playTop + 0.95;
+      const contentH = Math.max(9, yHigh - yLow);
+      const yPadFrac = 0.26;
+      let viewH = contentH * (1 + yPadFrac);
       let halfW = (viewH * aspect) / 2;
       if (halfW < minHalfW) {
         halfW = minHalfW;
         viewH = (2 * halfW) / aspect;
       }
-      if (viewH < minViewH) {
-        viewH = minViewH;
-        halfW = (viewH * aspect) / 2;
-      }
 
-      const padBelow = Math.max(2.2, bottomFrac * viewH);
-      let camBottom = floorY - padBelow;
-      let camTop = camBottom + viewH;
-      if (camTop < playTop + 0.4) {
-        const need = playTop + 0.4 - camTop;
-        camBottom -= need;
-        camTop += need;
-      }
-
+      const mid = (yLow + yHigh) / 2;
+      camera.bottom = mid - viewH / 2;
+      camera.top = mid + viewH / 2;
       camera.left = -halfW;
       camera.right = halfW;
-      camera.bottom = camBottom;
-      camera.top = camTop;
-      const midY = (camera.top + camera.bottom) / 2;
-      camera.position.set(0, midY, 20);
+      camera.position.set(0, mid, 20);
       camera.up.set(0, 1, 0);
-      camera.lookAt(0, midY, 0);
-      camera.near = 0.5;
-      camera.far = 80;
+      camera.lookAt(0, mid, 0);
+      camera.near = 0.35;
+      camera.far = 95;
       camera.updateProjectionMatrix();
     }
 
@@ -412,10 +393,12 @@
         roughness: 0.32,
         metalness: 0.12,
         emissive: spec.color,
-        emissiveIntensity: 0.22,
+        emissiveIntensity: 0.55,
+        depthTest: true,
+        depthWrite: true,
       });
       ghostMesh = new THREE.Mesh(geo, mat);
-      ghostMesh.renderOrder = 2;
+      ghostMesh.renderOrder = 10;
       scene.add(ghostMesh);
       ghostVisualType = type;
     }
@@ -437,7 +420,7 @@
       const worldX =
         camera.left + ((ndcX + 1) / 2) * (camera.right - camera.left);
       const c = clampDropXZ(worldX, ROW_Z, spec.radius);
-      ghostPos.set(c.x, DROP_CENTER_Y, c.z);
+      ghostPos.set(c.x, DROP_CENTER_Y, GHOST_Z);
       ghostMesh.position.copy(ghostPos);
     }
 
@@ -496,7 +479,7 @@
           const rb = FRUITS[b.type].radius;
           const touch = ra + rb;
           const dist = a.body.position.distanceTo(b.body.position);
-          const mergeDist = touch * 1.1;
+          const mergeDist = touch * 1.14;
           if (dist > mergeDist) continue;
 
           const nx = (a.body.position.x + b.body.position.x) / 2;
@@ -544,37 +527,6 @@
       }
     }
 
-    function updateDropLock(dt) {
-      if (dropAllowed || gameOver) return;
-      if (!lastDroppedBody) {
-        dropAllowed = true;
-        dropLockCalmSec = 0;
-        return;
-      }
-      const entry = fruits.find((f) => f.body === lastDroppedBody);
-      if (!entry) {
-        lastDroppedBody = null;
-        dropAllowed = true;
-        dropLockCalmSec = 0;
-        return;
-      }
-      const r = FRUITS[entry.type].radius;
-      const top = lastDroppedBody.position.y + r;
-      const belowSpawnBand = top < DROP_CENTER_Y - 0.06;
-      const calm = lastDroppedBody.velocity.lengthSquared() < 0.05;
-      if (calm) dropLockCalmSec += dt;
-      else dropLockCalmSec = 0;
-      // Do NOT unlock on “calm only” while still in spawn band — that allowed spam into stack → pops → game over
-      const settled =
-        (belowSpawnBand && calm) ||
-        dropLockCalmSec > 2.0;
-      if (settled) {
-        dropAllowed = true;
-        lastDroppedBody = null;
-        dropLockCalmSec = 0;
-      }
-    }
-
     function fullReset() {
       fruits.slice().forEach(removeFruit);
       nextType = 0;
@@ -584,44 +536,39 @@
       levelScoreGoal = 200;
       gameOver = false;
       gameOverDwell = 0;
-      dropAllowed = true;
-      lastDroppedBody = null;
-      dropLockCalmSec = 0;
+      lastDropTime = 0;
       overlay.classList.remove('visible');
       syncHud();
       applyCupLayout();
       ensureGhostForType(pendingDropType());
-      ghostPos.y = DROP_CENTER_Y;
+      ghostPos.set(0, DROP_CENTER_Y, GHOST_Z);
+      updateGhostAt(innerWidth / 2, innerHeight / 2);
     }
 
     function dropNext() {
-      if (gameOver || !dropAllowed) return;
+      if (gameOver) return;
+      const now = performance.now();
+      if (now - lastDropTime < DROP_COOLDOWN_MS) return;
+      lastDropTime = now;
+
       const t = pendingDropType();
       nextType++;
       const spec = FRUITS[t];
-      const c = clampDropXZ(ghostPos.x, ghostPos.z, spec.radius);
+      const c = clampDropXZ(ghostPos.x, ROW_Z, spec.radius);
       spawnFruit(t, c.x, DROP_CENTER_Y, ROW_Z);
       const last = fruits[fruits.length - 1];
       last.body.velocity.set(0, -0.28, 0);
-      lastDroppedBody = last.body;
-      dropAllowed = false;
+      addScore(2);
       ensureGhostForType(pendingDropType());
     }
 
-    function pointerOnCanvas(clientX, clientY) {
-      const r = renderer.domElement.getBoundingClientRect();
-      return (
-        clientX >= r.left &&
-        clientX <= r.right &&
-        clientY >= r.top &&
-        clientY <= r.bottom
-      );
-    }
-
-    window.addEventListener('pointermove', (e) => {
-      if (!pointerOnCanvas(e.clientX, e.clientY)) return;
-      updateGhostAt(e.clientX, e.clientY);
-    });
+    renderer.domElement.addEventListener(
+      'pointermove',
+      (e) => {
+        updateGhostAt(e.clientX, e.clientY);
+      },
+      { passive: true },
+    );
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
@@ -664,8 +611,6 @@
         }
       }
       if (mergeCooldown > 0) mergeCooldown--;
-
-      updateDropLock(dt);
 
       for (const f of fruits) {
         f.body.position.z = ROW_Z;

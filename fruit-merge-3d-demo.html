@@ -19,9 +19,9 @@
 <body>
   <div id="ui">
     <strong>3D merge demo</strong><br />
-    Move pointer: preview next drop · Click: release<br />
+    Move pointer: preview next drop · Left click / tap: drop<br />
     Same size merges into the next bigger tier<br />
-    <kbd>R</kbd> reset world
+    Right-drag: orbit · Scroll: zoom · <kbd>R</kbd> reset
   </div>
 
   <script type="importmap">
@@ -74,6 +74,8 @@
     controls.mouseButtons.LEFT = undefined;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+    // One-finger touch = ghost move + tap drop (no orbit steal)
+    controls.touches.ONE = undefined;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.45));
     const sun = new THREE.DirectionalLight(0xffffff, 0.95);

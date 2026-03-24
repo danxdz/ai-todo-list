@@ -90,8 +90,9 @@
     };
 
     let CUP = { ...CUP_BASE, wallH: 11 };
+    /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
     let DROP_CENTER_Y = CUP.wallH - 0.55;
-    let GAME_OVER_Y = CUP.wallH - 0.32;
+    let GAME_OVER_Y = CUP.wallH - 0.12;
 
     const scoreEl = document.getElementById('scoreVal');
     const levelEl = document.getElementById('levelVal');
@@ -317,7 +318,8 @@
     function applyCupLayout() {
       CUP.wallH = computeCupHeightForViewport();
       DROP_CENTER_Y = CUP.wallH - 0.55;
-      GAME_OVER_Y = CUP.wallH - 0.38;
+      // Just under rim — must stay above drop + largest spawn radius (~0.26) or first click = game over
+      GAME_OVER_Y = CUP.wallH - 0.12;
       buildCupVisuals();
       buildStaticPhysics();
       fitCameraToCup();

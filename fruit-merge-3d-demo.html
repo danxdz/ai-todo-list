@@ -37,7 +37,7 @@
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
-    <span style="font-size:12px;opacity:.85">Fixed 2D-style view · <kbd>F</kbd> browser fullscreen</span>
+    <span style="font-size:12px;opacity:.85">Build <span id="buildId">v8</span> · <kbd>F</kbd> fullscreen</span>
   </div>
   <div id="overlay">
     <div id="overlayTitle">Game over</div>
@@ -114,7 +114,7 @@
 
     /** Require pile above line for this long (seconds) — ignores one-frame physics spikes */
     let gameOverDwell = 0;
-    const GAME_OVER_DWELL_SEC = 0.45;
+    const GAME_OVER_DWELL_SEC = 0.95;
 
     function syncHud() {
       scoreEl.textContent = String(score);
@@ -318,52 +318,46 @@
     }
 
     /**
-     * Bottom-anchored ortho: floor must sit *above* the canvas bottom — use a fraction of
-     * view height for padding (fixed world units vanish on wide landscape windows).
+     * Ortho frustum MUST satisfy (right-left)/(top-bottom) = canvas width/height or the
+     * scene squishes into a thin vertical strip. Never cap halfW without recomputing viewH.
      */
     function fitCameraToCup() {
       const wh = CUP.wallH;
       const hx = CUP.halfX + CUP.wallT + 0.32;
-      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.6;
+      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.65;
       const floorY = 0;
       const aspect = Math.max(0.28, innerWidth / innerHeight);
-      const minHalfW = hx * 1.06;
+      const minHalfW = hx * 1.08;
 
       const contentSpan = Math.max(6.5, playTop - floorY);
-      const topPad = 0.55;
-      /** Min fraction of view height reserved below floor (visible “play mat”) */
-      const bottomFrac = 0.14;
-      /** Solve: viewH = contentSpan + topPad + bottomFrac * viewH */
-      let viewH = (contentSpan + topPad) / (1 - bottomFrac);
+      const topPad = 0.6;
+      const bottomFrac = 0.18;
+      const minViewH = (contentSpan + topPad) / (1 - bottomFrac);
+
+      let viewH = minViewH;
       let halfW = (viewH * aspect) / 2;
       if (halfW < minHalfW) {
         halfW = minHalfW;
         viewH = (2 * halfW) / aspect;
       }
-      const minViewH = (contentSpan + topPad) / (1 - bottomFrac);
       if (viewH < minViewH) {
         viewH = minViewH;
-        halfW = Math.max(minHalfW, (viewH * aspect) / 2);
+        halfW = (viewH * aspect) / 2;
       }
 
-      // Wide windows: keep a ~9:16 “phone column” so the lane is big on screen (not a tiny center sliver)
-      const halfWPortrait = (viewH * (9 / 16)) / 2;
-      halfW = Math.max(minHalfW, Math.min(halfW, halfWPortrait));
-
-      const padBelow = Math.max(2.0, bottomFrac * viewH);
-      const camBottom = floorY - padBelow;
-      const camTop = camBottom + viewH;
-      if (camTop < playTop + 0.35) {
-        const need = playTop + 0.35 - camTop;
-        camera.bottom = camBottom - need;
-        camera.top = camTop + need;
-      } else {
-        camera.bottom = camBottom;
-        camera.top = camTop;
+      const padBelow = Math.max(2.2, bottomFrac * viewH);
+      let camBottom = floorY - padBelow;
+      let camTop = camBottom + viewH;
+      if (camTop < playTop + 0.4) {
+        const need = playTop + 0.4 - camTop;
+        camBottom -= need;
+        camTop += need;
       }
 
       camera.left = -halfW;
       camera.right = halfW;
+      camera.bottom = camBottom;
+      camera.top = camTop;
       const midY = (camera.top + camera.bottom) / 2;
       camera.position.set(0, midY, 20);
       camera.up.set(0, 1, 0);
@@ -566,14 +560,14 @@
       }
       const r = FRUITS[entry.type].radius;
       const top = lastDroppedBody.position.y + r;
-      const belowSpawnBand = top < DROP_CENTER_Y - 0.04;
-      const calm = lastDroppedBody.velocity.lengthSquared() < 0.06;
+      const belowSpawnBand = top < DROP_CENTER_Y - 0.06;
+      const calm = lastDroppedBody.velocity.lengthSquared() < 0.05;
       if (calm) dropLockCalmSec += dt;
       else dropLockCalmSec = 0;
+      // Do NOT unlock on “calm only” while still in spawn band — that allowed spam into stack → pops → game over
       const settled =
         (belowSpawnBand && calm) ||
-        (calm && dropLockCalmSec > 0.28) ||
-        dropLockCalmSec > 1.2;
+        dropLockCalmSec > 2.0;
       if (settled) {
         dropAllowed = true;
         lastDroppedBody = null;

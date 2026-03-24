@@ -83,7 +83,8 @@
     const MERGE_POINTS = FRUITS.map((_, i) => (i + 1) * 15);
 
     const CUP_BASE = {
-      halfX: 2.05,
+      /** Wider lane ≈ mobile portrait column when framed */
+      halfX: 2.85,
       get halfZ() {
         return Math.max(0.52, MAX_RADIUS + 0.08);
       },
@@ -317,32 +318,50 @@
     }
 
     /**
-     * Bottom-anchored ortho: floor sits near bottom of screen (mobile portrait),
-     * cup scales to use vertical space; width grows with aspect so balls aren’t clipped.
+     * Bottom-anchored ortho: floor must sit *above* the canvas bottom — use a fraction of
+     * view height for padding (fixed world units vanish on wide landscape windows).
      */
     function fitCameraToCup() {
       const wh = CUP.wallH;
-      const hx = CUP.halfX + CUP.wallT + 0.28;
-      // Extra margin below y=0 so floor + resting balls stay in frame (was clipping “under” view)
-      const playBottom = -1.45;
-      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.55;
-      const contentH = Math.max(6.5, playTop - playBottom);
+      const hx = CUP.halfX + CUP.wallT + 0.32;
+      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.6;
+      const floorY = 0;
       const aspect = Math.max(0.28, innerWidth / innerHeight);
-      const minHalfW = hx * 1.08;
+      const minHalfW = hx * 1.06;
 
-      let viewH = contentH * 1.04;
+      const contentSpan = Math.max(6.5, playTop - floorY);
+      const topPad = 0.55;
+      /** Min fraction of view height reserved below floor (visible “play mat”) */
+      const bottomFrac = 0.14;
+      /** Solve: viewH = contentSpan + topPad + bottomFrac * viewH */
+      let viewH = (contentSpan + topPad) / (1 - bottomFrac);
       let halfW = (viewH * aspect) / 2;
       if (halfW < minHalfW) {
         halfW = minHalfW;
         viewH = (2 * halfW) / aspect;
       }
-      if (viewH < contentH * 1.02) {
-        viewH = contentH * 1.02;
+      const minViewH = (contentSpan + topPad) / (1 - bottomFrac);
+      if (viewH < minViewH) {
+        viewH = minViewH;
         halfW = Math.max(minHalfW, (viewH * aspect) / 2);
       }
 
-      camera.bottom = playBottom;
-      camera.top = playBottom + viewH;
+      // Wide windows: keep a ~9:16 “phone column” so the lane is big on screen (not a tiny center sliver)
+      const halfWPortrait = (viewH * (9 / 16)) / 2;
+      halfW = Math.max(minHalfW, Math.min(halfW, halfWPortrait));
+
+      const padBelow = Math.max(2.0, bottomFrac * viewH);
+      const camBottom = floorY - padBelow;
+      const camTop = camBottom + viewH;
+      if (camTop < playTop + 0.35) {
+        const need = playTop + 0.35 - camTop;
+        camera.bottom = camBottom - need;
+        camera.top = camTop + need;
+      } else {
+        camera.bottom = camBottom;
+        camera.top = camTop;
+      }
+
       camera.left = -halfW;
       camera.right = halfW;
       const midY = (camera.top + camera.bottom) / 2;
@@ -350,7 +369,7 @@
       camera.up.set(0, 1, 0);
       camera.lookAt(0, midY, 0);
       camera.near = 0.5;
-      camera.far = 70;
+      camera.far = 80;
       camera.updateProjectionMatrix();
     }
 

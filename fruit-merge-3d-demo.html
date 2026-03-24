@@ -19,8 +19,8 @@
 <body>
   <div id="ui">
     <strong>3D merge demo</strong><br />
-    Click / tap: drop next fruit<br />
-    Same colors merge into a bigger one<br />
+    Move pointer: preview next drop · Click: release<br />
+    Same size merges into the next bigger tier<br />
     <kbd>R</kbd> reset world
   </div>
 
@@ -41,7 +41,6 @@
 
     // --- Tunables
     const CUP = { halfX: 2.2, halfZ: 1.6, wallH: 5, wallT: 0.15 };
-    const MAX_TYPE = 4;
     const FRUITS = [
       { radius: 0.22, color: 0xff6b9d },
       { radius: 0.28, color: 0xff9f43 },
@@ -49,6 +48,8 @@
       { radius: 0.46, color: 0x5f27cd },
       { radius: 0.58, color: 0x00d2d3 },
     ];
+    /** Highest tier that can still pair (two of this merge to tier + 1) */
+    const MERGEABLE_TYPE_MAX = FRUITS.length - 2;
 
     // --- Three
     const scene = new THREE.Scene();
@@ -69,6 +70,10 @@
     controls.target.set(0, 1.2, 0);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI * 0.48;
+    // Left click / tap = drop fruit; orbit with right-drag (middle = zoom)
+    controls.mouseButtons.LEFT = undefined;
+    controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.45));
     const sun = new THREE.DirectionalLight(0xffffff, 0.95);
@@ -83,36 +88,49 @@
     sun.shadow.camera.bottom = -2;
     scene.add(sun);
 
-    // Glassy cup (visual only)
-    const cupMat = new THREE.MeshPhysicalMaterial({
-      color: 0xa8c8ff,
-      metalness: 0,
-      roughness: 0.15,
-      transmission: 0.55,
-      thickness: 0.4,
+    // Cup visuals: rim + edges only (avoids stacked transmission “double glass”)
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x8ab4e8,
+      metalness: 0.25,
+      roughness: 0.35,
       transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
+      opacity: 0.88,
     });
-    const floorGeo = new THREE.PlaneGeometry(CUP.halfX * 2 + 0.4, CUP.halfZ * 2 + 0.4);
-    const floorVis = new THREE.Mesh(floorGeo, cupMat);
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x3d4a5c,
+      metalness: 0.05,
+      roughness: 0.85,
+    });
+    const floorGeo = new THREE.PlaneGeometry(CUP.halfX * 2 + 0.2, CUP.halfZ * 2 + 0.2);
+    const floorVis = new THREE.Mesh(floorGeo, floorMat);
     floorVis.rotation.x = -Math.PI / 2;
-    floorVis.position.y = 0.01;
+    floorVis.position.y = 0.002;
     floorVis.receiveShadow = true;
     scene.add(floorVis);
 
-    function wallMesh(w, h, d, x, y, z) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cupMat);
+    const edgeT = 0.06;
+    const wh = CUP.wallH;
+    function addEdgeBox(w, h, d, x, y, z) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rimMat);
       m.position.set(x, y, z);
       m.castShadow = true;
       m.receiveShadow = true;
       scene.add(m);
     }
-    const wh = CUP.wallH;
-    wallMesh(CUP.wallT, wh, CUP.halfZ * 2 + CUP.wallT * 2, -CUP.halfX - CUP.wallT / 2, wh / 2, 0);
-    wallMesh(CUP.wallT, wh, CUP.halfZ * 2 + CUP.wallT * 2,  CUP.halfX + CUP.wallT / 2, wh / 2, 0);
-    wallMesh(CUP.halfX * 2, wh, CUP.wallT, 0, wh / 2, -CUP.halfZ - CUP.wallT / 2);
-    wallMesh(CUP.halfX * 2, wh, CUP.wallT, 0, wh / 2,  CUP.halfZ + CUP.wallT / 2);
+    // Top rim
+    addEdgeBox(CUP.halfX * 2 + edgeT * 2, edgeT, edgeT, 0, wh, -CUP.halfZ - edgeT / 2);
+    addEdgeBox(CUP.halfX * 2 + edgeT * 2, edgeT, edgeT, 0, wh,  CUP.halfZ + edgeT / 2);
+    addEdgeBox(edgeT, edgeT, CUP.halfZ * 2 + edgeT * 2, -CUP.halfX - edgeT / 2, wh, 0);
+    addEdgeBox(edgeT, edgeT, CUP.halfZ * 2 + edgeT * 2,  CUP.halfX + edgeT / 2, wh, 0);
+    // Vertical corner posts (thin)
+    const postY = wh / 2;
+    function post(x, z) {
+      addEdgeBox(edgeT, wh, edgeT, x, postY, z);
+    }
+    post(-CUP.halfX, -CUP.halfZ);
+    post( CUP.halfX, -CUP.halfZ);
+    post(-CUP.halfX,  CUP.halfZ);
+    post( CUP.halfX,  CUP.halfZ);
 
     // --- Cannon world
     const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -18, 0) });
@@ -141,10 +159,78 @@
     addStaticBox(CUP.halfX, CUP.wallH / 2, CUP.wallT / 2, 0, CUP.wallH / 2, -CUP.halfZ - CUP.wallT / 2);
     addStaticBox(CUP.halfX, CUP.wallH / 2, CUP.wallT / 2, 0, CUP.wallH / 2,  CUP.halfZ + CUP.wallT / 2);
 
+    const raycaster = new THREE.Raycaster();
+    const dropPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const planeHit = new THREE.Vector3();
+    const DROP_CENTER_Y = CUP.wallH - 0.5;
+
     /** @type {{ mesh: THREE.Mesh, body: CANNON.Body, type: number }[]} */
     let fruits = [];
+    /** Clicks alternate the two smallest tiers (Suika-style queue) */
     let nextType = 0;
     let mergeCooldown = 0;
+
+    /** Ghost sphere: no physics, follows pointer */
+    let ghostMesh = null;
+    let ghostVisualType = -1;
+    const ghostPos = new THREE.Vector3(0, DROP_CENTER_Y, 0);
+
+    function disposeGhost() {
+      if (!ghostMesh) return;
+      scene.remove(ghostMesh);
+      ghostMesh.geometry.dispose();
+      if (ghostMesh.material && typeof ghostMesh.material.dispose === 'function') {
+        ghostMesh.material.dispose();
+      }
+      ghostMesh = null;
+      ghostVisualType = -1;
+    }
+
+    function ensureGhostForType(type) {
+      if (ghostVisualType === type && ghostMesh) return;
+      disposeGhost();
+      const spec = FRUITS[type];
+      const geo = new THREE.SphereGeometry(spec.radius, 28, 20);
+      const mat = new THREE.MeshStandardMaterial({
+        color: spec.color,
+        roughness: 0.35,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+      });
+      ghostMesh = new THREE.Mesh(geo, mat);
+      ghostMesh.renderOrder = 1;
+      scene.add(ghostMesh);
+      ghostVisualType = type;
+    }
+
+    function pendingDropType() {
+      return nextType % 2;
+    }
+
+    function clampDropXZ(x, z, radius) {
+      const m = Math.max(radius * 0.85, 0.05);
+      return {
+        x: Math.max(-CUP.halfX + m, Math.min(CUP.halfX - m, x)),
+        z: Math.max(-CUP.halfZ + m, Math.min(CUP.halfZ - m, z)),
+      };
+    }
+
+    function updateGhostAt(clientX, clientY) {
+      const t = pendingDropType();
+      ensureGhostForType(t);
+      const spec = FRUITS[t];
+      const rect = renderer.domElement.getBoundingClientRect();
+      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+      const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+      dropPlane.constant = -DROP_CENTER_Y;
+      if (!raycaster.ray.intersectPlane(dropPlane, planeHit)) return;
+      const c = clampDropXZ(planeHit.x, planeHit.z, spec.radius);
+      ghostPos.set(c.x, DROP_CENTER_Y, c.z);
+      ghostMesh.position.copy(ghostPos);
+    }
 
     function spawnFruit(type, x, y, z) {
       const spec = FRUITS[type];
@@ -188,7 +274,7 @@
 
     function tryMerge() {
       if (mergeCooldown > 0) return;
-      const dynamics = fruits.filter((f) => f.type < MAX_TYPE - 1);
+      const dynamics = fruits.filter((f) => f.type <= MERGEABLE_TYPE_MAX);
       for (let i = 0; i < dynamics.length; i++) {
         for (let j = i + 1; j < dynamics.length; j++) {
           const a = dynamics[i];
@@ -197,17 +283,19 @@
           const ra = FRUITS[a.type].radius;
           const rb = FRUITS[b.type].radius;
           const dist = a.body.position.distanceTo(b.body.position);
-          const mergeDist = (ra + rb) * 0.82;
+          const mergeDist = (ra + rb) * 0.92;
           if (dist > mergeDist) continue;
 
           const nx = (a.body.position.x + b.body.position.x) / 2;
-          const ny = Math.max(ra, (a.body.position.y + b.body.position.y) / 2);
+          const ny = (a.body.position.y + b.body.position.y) / 2;
           const nz = (a.body.position.z + b.body.position.z) / 2;
           const newType = a.type + 1;
+          const rNew = FRUITS[newType].radius;
+          const nyLifted = Math.max(rNew * 0.5, ny);
 
           removeFruit(a);
           removeFruit(b);
-          spawnFruit(newType, nx, ny, nz);
+          spawnFruit(newType, nx, nyLifted, nz);
           // Nudge awake
           mergeCooldown = 8;
           return;
@@ -219,22 +307,28 @@
       fruits.slice().forEach(removeFruit);
       nextType = 0;
       mergeCooldown = 0;
+      ensureGhostForType(pendingDropType());
     }
 
     function dropNext() {
-      const t = nextType % 2; // only drop small tiers like Suika preview (demo)
+      const t = pendingDropType();
       nextType++;
       const spec = FRUITS[t];
-      const x = (Math.random() - 0.5) * 0.3;
-      const z = (Math.random() - 0.5) * 0.3;
-      spawnFruit(t, x, CUP.wallH - 0.5, z);
-      // Small downward impulse so it doesn't sit on the "ceiling"
+      const c = clampDropXZ(ghostPos.x, ghostPos.z, spec.radius);
+      spawnFruit(t, c.x, DROP_CENTER_Y, c.z);
       const last = fruits[fruits.length - 1];
       last.body.velocity.set(0, -0.5, 0);
+      ensureGhostForType(pendingDropType());
     }
 
-    window.addEventListener('pointerdown', (e) => {
+    renderer.domElement.addEventListener('pointermove', (e) => {
       if (e.target !== renderer.domElement) return;
+      updateGhostAt(e.clientX, e.clientY);
+    });
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      updateGhostAt(e.clientX, e.clientY);
       dropNext();
     });
 
@@ -273,6 +367,9 @@
 
       renderer.render(scene, camera);
     }
+
+    ensureGhostForType(pendingDropType());
+    updateGhostAt(innerWidth / 2, innerHeight / 2);
 
     tick();
   </script>

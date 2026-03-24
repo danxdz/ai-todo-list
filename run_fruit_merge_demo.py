@@ -57,6 +57,13 @@ def main() -> int:
     os.chdir(root)
 
     class Handler(SimpleHTTPRequestHandler):
+        def end_headers(self) -> None:
+            # Avoid stale demo when iterating locally (browser aggressive caching)
+            if self.path.endswith(".html"):
+                self.send_header("Cache-Control", "no-store, max-age=0")
+                self.send_header("Pragma", "no-cache")
+            super().end_headers()
+
         def log_message(self, fmt: str, *log_args: object) -> None:
             sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % log_args))
 
@@ -64,7 +71,7 @@ def main() -> int:
     # (we actually open before serve_forever, but threading is still nicer for multiple tabs)
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
 
-    url = f"http://{args.host}:{args.port}/fruit-merge-3d-demo.html"
+    url = f"http://{args.host}:{args.port}/fruit-merge-3d-demo.html?v=2"
     print(f"Serving {root}")
     print(f"Open: {url}")
     print("Press Ctrl+C to stop.")

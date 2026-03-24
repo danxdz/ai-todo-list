@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
   <title>3D fruit merge — minimal demo</title>
   <style>
     * { box-sizing: border-box; }
@@ -34,7 +36,7 @@
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
-    <span style="font-size:12px;opacity:.85">Preview: solid ball · lane locked on Z</span>
+    <span style="font-size:12px;opacity:.85">Fixed 2D-style view · <kbd>F</kbd> browser fullscreen</span>
   </div>
   <div id="overlay">
     <div id="overlayTitle">Game over</div>
@@ -42,9 +44,8 @@
     <div style="font-size:45%;opacity:.75;margin-top:8px">Press <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> to restart</div>
   </div>
   <div id="help">
-    Left click: drop · Right-drag: orbit<br />
-    Merge = points · Level every goal pts<br />
-    <kbd>R</kbd> reset
+    Move / click: aim & drop<br />
+    Merge = points · <kbd>R</kbd> reset · <kbd>F</kbd> fullscreen
   </div>
 
   <script type="importmap">
@@ -59,7 +60,6 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import * as CANNON from 'cannon-es';
 
     const ROW_Z = 0;
@@ -122,9 +122,10 @@
     // --- Three
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050508);
-    scene.fog = new THREE.Fog(0x050508, 25, 55);
+    scene.fog = null;
 
-    const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.08, 120);
+    /** Orthographic = fixed “2D” view (no orbit / perspective tilt) */
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 80);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -133,17 +134,9 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.maxPolarAngle = Math.PI * 0.49;
-    controls.mouseButtons.LEFT = undefined;
-    controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
-    controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
-    controls.touches.ONE = undefined;
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.42));
     const sun = new THREE.DirectionalLight(0xffffff, 0.92);
-    sun.position.set(3.5, 14, 8);
+    sun.position.set(0.8, 16, 10);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.near = 0.5;
@@ -296,24 +289,28 @@
 
     function fitCameraToCup() {
       const wh = CUP.wallH;
-      const hx = CUP.halfX;
-      const hz = CUP.halfZ;
-      const box = new THREE.Box3(
-        new THREE.Vector3(-hx - 0.35, -0.3, -hz - 0.35),
-        new THREE.Vector3( hx + 0.35, Math.max(wh, DROP_CENTER_Y) + 0.5, hz + 0.35),
-      );
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const aspect = Math.max(0.5, innerWidth / innerHeight);
-      const fov = camera.fov * (Math.PI / 180);
-      const fitHeightDistance = size.y / (2 * Math.tan(fov / 2));
-      const fitWidthDistance = size.x / (2 * Math.tan(fov / 2) * aspect);
-      let dist = Math.max(fitHeightDistance, fitWidthDistance) * 1.06 + hz * 1.2;
-      dist = Math.min(Math.max(dist, 8), 28);
-      camera.position.set(center.x, center.y + size.y * 0.06, center.z + dist);
-      controls.target.copy(center);
-      camera.near = Math.max(0.05, dist / 200);
-      camera.far = dist * 4;
+      const hx = CUP.halfX + CUP.wallT + 0.22;
+      const minY = -0.65;
+      const maxY = Math.max(wh, DROP_CENTER_Y) + 0.5;
+      const contentH = maxY - minY;
+      const centerY = (minY + maxY) / 2;
+      const aspect = Math.max(0.35, innerWidth / innerHeight);
+      let viewH = contentH * 1.06;
+      let viewW = viewH * aspect;
+      const minW = hx * 2 * 1.12;
+      if (viewW < minW) {
+        viewW = minW;
+        viewH = viewW / aspect;
+      }
+      camera.left = -viewW / 2;
+      camera.right = viewW / 2;
+      camera.top = centerY + viewH / 2;
+      camera.bottom = centerY - viewH / 2;
+      camera.position.set(0, centerY, 18);
+      camera.up.set(0, 1, 0);
+      camera.lookAt(0, centerY, 0);
+      camera.near = 0.5;
+      camera.far = 60;
       camera.updateProjectionMatrix();
     }
 
@@ -520,12 +517,20 @@
       dropNext();
     });
 
+    function toggleBrowserFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    }
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'r' || e.key === 'R') fullReset();
+      if (e.key === 'f' || e.key === 'F') toggleBrowserFullscreen();
     });
 
     window.addEventListener('resize', () => {
-      camera.aspect = innerWidth / innerHeight;
       renderer.setSize(innerWidth, innerHeight);
       applyCupLayout();
       updateGhostAt(innerWidth / 2, innerHeight / 2);
@@ -538,7 +543,6 @@
     function tick() {
       requestAnimationFrame(tick);
       const dt = Math.min(clock.getDelta(), 0.05);
-      controls.update();
 
       if (!gameOver) {
         acc += dt;

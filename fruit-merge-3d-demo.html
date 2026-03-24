@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
+  <link rel="icon" href="data:," />
   <title>3D fruit merge — minimal demo</title>
   <style>
     * { box-sizing: border-box; }
@@ -48,12 +49,12 @@
     Merge = points · <kbd>R</kbd> reset · <kbd>F</kbd> fullscreen
   </div>
 
+  <!-- Local vendor/ so the game works offline and when CDN DNS fails (ERR_NAME_NOT_RESOLVED) -->
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-      "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+      "three": "./vendor/three.module.js",
+      "cannon-es": "./vendor/cannon-es.js"
     }
   }
   </script>
@@ -322,7 +323,8 @@
     function fitCameraToCup() {
       const wh = CUP.wallH;
       const hx = CUP.halfX + CUP.wallT + 0.28;
-      const playBottom = -0.28;
+      // Extra margin below y=0 so floor + resting balls stay in frame (was clipping “under” view)
+      const playBottom = -1.45;
       const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.55;
       const contentH = Math.max(6.5, playTop - playBottom);
       const aspect = Math.max(0.28, innerWidth / innerHeight);

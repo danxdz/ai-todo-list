@@ -20,7 +20,7 @@
   <div id="ui">
     <strong>3D merge demo</strong><br />
     Move pointer: preview next drop · Left click / tap: drop<br />
-    Same size merges into the next bigger tier<br />
+    Narrow lane (2D-style): aim along one row · Same size merges up<br />
     Right-drag: orbit · Scroll: zoom · <kbd>R</kbd> reset
   </div>
 
@@ -40,7 +40,11 @@
     import * as CANNON from 'cannon-es';
 
     // --- Tunables
-    const CUP = { halfX: 2.2, halfZ: 1.6, wallH: 5, wallT: 0.15 };
+    /** halfZ just wider than largest fruit radius so balls stay in one “row” (2D in 3D) */
+    const CUP = { halfX: 1.65, halfZ: 0.62, wallH: 5, wallT: 0.15 };
+    const ROW_Z = 0;
+    const FRUIT_MASS_BASE = 6;
+    const FRUIT_MASS_PER_TIER = 0.9;
     const FRUITS = [
       { radius: 0.22, color: 0xff6b9d },
       { radius: 0.28, color: 0xff9f43 },
@@ -57,7 +61,7 @@
     scene.fog = new THREE.Fog(0x2c3038, 12, 28);
 
     const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
-    camera.position.set(0, 6.5, 9);
+    camera.position.set(0, 6.2, 11.5);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -142,8 +146,8 @@
 
     const physicsMaterial = new CANNON.Material('fruit');
     const fruitContact = new CANNON.ContactMaterial(physicsMaterial, physicsMaterial, {
-      friction: 0.2,
-      restitution: 0.12,
+      friction: 0.18,
+      restitution: 0.18,
     });
     world.addContactMaterial(fruitContact);
 
@@ -211,11 +215,11 @@
       return nextType % 2;
     }
 
-    function clampDropXZ(x, z, radius) {
+    function clampDropXZ(x, _z, radius) {
       const m = Math.max(radius * 0.85, 0.05);
       return {
         x: Math.max(-CUP.halfX + m, Math.min(CUP.halfX - m, x)),
-        z: Math.max(-CUP.halfZ + m, Math.min(CUP.halfZ - m, z)),
+        z: ROW_Z,
       };
     }
 
@@ -249,13 +253,13 @@
 
       const shape = new CANNON.Sphere(spec.radius);
       const body = new CANNON.Body({
-        mass: 1 + type * 0.15,
-        linearDamping: 0.05,
-        angularDamping: 0.2,
+        mass: FRUIT_MASS_BASE + type * FRUIT_MASS_PER_TIER,
+        linearDamping: 0.03,
+        angularDamping: 0.18,
         material: physicsMaterial,
       });
       body.addShape(shape);
-      body.position.set(x, y, z);
+      body.position.set(x, y, ROW_Z);
       body.sleepSpeedLimit = 0.35;
       body.sleepTimeLimit = 0.4;
       body.fruitType = type;
@@ -293,7 +297,7 @@
 
           const nx = (a.body.position.x + b.body.position.x) / 2;
           const ny = (a.body.position.y + b.body.position.y) / 2;
-          const nz = (a.body.position.z + b.body.position.z) / 2;
+          const nz = ROW_Z;
           const newType = a.type + 1;
           const rNew = FRUITS[newType].radius;
           const nyLifted = Math.max(rNew * 0.5, ny);
@@ -320,7 +324,7 @@
       nextType++;
       const spec = FRUITS[t];
       const c = clampDropXZ(ghostPos.x, ghostPos.z, spec.radius);
-      spawnFruit(t, c.x, DROP_CENTER_Y, c.z);
+      spawnFruit(t, c.x, DROP_CENTER_Y, ROW_Z);
       const last = fruits[fruits.length - 1];
       last.body.velocity.set(0, -0.5, 0);
       ensureGhostForType(pendingDropType());
@@ -364,6 +368,8 @@
       if (mergeCooldown > 0) mergeCooldown--;
 
       for (const f of fruits) {
+        f.body.position.z = ROW_Z;
+        f.body.velocity.z = 0;
         f.mesh.position.copy(f.body.position);
         f.mesh.quaternion.copy(f.body.quaternion);
       }

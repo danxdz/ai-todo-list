@@ -14,6 +14,7 @@
       position: fixed; left: 12px; top: 10px; z-index: 2;
       color: #eee; font-size: 14px; line-height: 1.45; max-width: 280px;
       text-shadow: 0 1px 3px #000;
+      pointer-events: none;
     }
     #hud strong { color: #fff; }
     #hud kbd { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
@@ -28,6 +29,7 @@
       position: fixed; right: 10px; bottom: 10px; z-index: 2;
       color: #888; font-size: 12px; max-width: 220px; text-align: right;
       line-height: 1.35;
+      pointer-events: none;
     }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   </style>
@@ -37,7 +39,7 @@
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
-    <span style="font-size:12px;opacity:.85">Build <span id="buildId">v8</span> · <kbd>F</kbd> fullscreen</span>
+    <span style="font-size:12px;opacity:.85">Build <span id="buildId">v9</span> · <kbd>F</kbd> fullscreen</span>
   </div>
   <div id="overlay">
     <div id="overlayTitle">Game over</div>
@@ -380,10 +382,6 @@
 
     applyCupLayout();
 
-    const raycaster = new THREE.Raycaster();
-    const dropPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const planeHit = new THREE.Vector3();
-
     /** @type {{ mesh: THREE.Mesh, body: CANNON.Body, type: number }[]} */
     let fruits = [];
     let nextType = 0;
@@ -431,12 +429,14 @@
       ensureGhostForType(t);
       const spec = FRUITS[t];
       const rect = renderer.domElement.getBoundingClientRect();
-      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-      const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-      dropPlane.constant = -DROP_CENTER_Y;
-      if (!raycaster.ray.intersectPlane(dropPlane, planeHit)) return;
-      const c = clampDropXZ(planeHit.x, planeHit.z, spec.radius);
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height);
+      const ndcX = ((clientX - rect.left) / w) * 2 - 1;
+      // Ortho camera looks along -Z: rays are parallel to the XZ plane (dy≈0), so
+      // ray–horizontal-plane intersection never works — map screen X → world X directly.
+      const worldX =
+        camera.left + ((ndcX + 1) / 2) * (camera.right - camera.left);
+      const c = clampDropXZ(worldX, ROW_Z, spec.radius);
       ghostPos.set(c.x, DROP_CENTER_Y, c.z);
       ghostMesh.position.copy(ghostPos);
     }
@@ -608,8 +608,18 @@
       ensureGhostForType(pendingDropType());
     }
 
-    renderer.domElement.addEventListener('pointermove', (e) => {
-      if (e.target !== renderer.domElement) return;
+    function pointerOnCanvas(clientX, clientY) {
+      const r = renderer.domElement.getBoundingClientRect();
+      return (
+        clientX >= r.left &&
+        clientX <= r.right &&
+        clientY >= r.top &&
+        clientY <= r.bottom
+      );
+    }
+
+    window.addEventListener('pointermove', (e) => {
+      if (!pointerOnCanvas(e.clientX, e.clientY)) return;
       updateGhostAt(e.clientX, e.clientY);
     });
 

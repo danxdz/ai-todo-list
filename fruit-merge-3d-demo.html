@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>3D fruit merge — minimal demo</title>
+  <title>fruit-merge v12</title>
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse 120% 80% at 50% 100%, #151a24 0%, #07080c 55%); font-family: system-ui, sans-serif; }
@@ -36,10 +36,11 @@
 </head>
 <body>
   <div id="hud">
+    <span style="font-size:11px;color:#7ab8ff">demo <strong id="buildId">v12</strong></span><br />
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
-    <span style="font-size:12px;opacity:.85">Build <span id="buildId">v10</span> · <kbd>F</kbd> fullscreen</span>
+    <span style="font-size:12px;opacity:.85"><kbd>F</kbd> fullscreen</span>
   </div>
   <div id="overlay">
     <div id="overlayTitle">Game over</div>
@@ -322,29 +323,36 @@
     function fitCameraToCup() {
       const wh = CUP.wallH;
       const hx = CUP.halfX + CUP.wallT + 0.35;
-      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.85;
+      const rimTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y);
       const aspect = Math.max(0.28, innerWidth / innerHeight);
       const minHalfW = hx * 1.1;
 
-      const yLow = -2.35;
-      const yHigh = playTop + 0.95;
-      const contentH = Math.max(9, yHigh - yLow);
-      const yPadFrac = 0.26;
-      let viewH = contentH * (1 + yPadFrac);
+      const floorY = 0;
+      /** Visible “mat” below the floor (world units); maps to a small band at canvas bottom */
+      const padBelow = 1.05;
+      /** Breathing room above rim */
+      const padAbove = 0.75;
+      const contentLow = floorY - padBelow;
+      const contentHigh = rimTop + padAbove;
+      const contentH = Math.max(8.5, contentHigh - contentLow);
+
+      let viewH = contentH;
       let halfW = (viewH * aspect) / 2;
       if (halfW < minHalfW) {
         halfW = minHalfW;
         viewH = (2 * halfW) / aspect;
       }
+      if (viewH < contentH) viewH = contentH;
 
-      const mid = (yLow + yHigh) / 2;
-      camera.bottom = mid - viewH / 2;
-      camera.top = mid + viewH / 2;
+      // Bottom-anchored: floor sits above canvas bottom with padding; extra view height goes above rim
+      camera.bottom = contentLow;
+      camera.top = contentLow + viewH;
+      const midY = (camera.bottom + camera.top) / 2;
       camera.left = -halfW;
       camera.right = halfW;
-      camera.position.set(0, mid, 20);
+      camera.position.set(0, midY, 20);
       camera.up.set(0, 1, 0);
-      camera.lookAt(0, mid, 0);
+      camera.lookAt(0, midY, 0);
       camera.near = 0.35;
       camera.far = 95;
       camera.updateProjectionMatrix();

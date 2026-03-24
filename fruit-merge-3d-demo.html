@@ -104,6 +104,16 @@
     let levelScoreGoal = 200;
     let gameOver = false;
 
+    /** One drop at a time until the last spawn clears the drop band (stops overlap pops → false game over). */
+    let dropAllowed = true;
+    /** @type {CANNON.Body | null} */
+    let lastDroppedBody = null;
+    let dropLockCalmSec = 0;
+
+    /** Require pile above line for this long (seconds) — ignores one-frame physics spikes */
+    let gameOverDwell = 0;
+    const GAME_OVER_DWELL_SEC = 0.45;
+
     function syncHud() {
       scoreEl.textContent = String(score);
       levelEl.textContent = String(level);
@@ -389,7 +399,7 @@
         roughness: 0.32,
         metalness: 0.12,
         emissive: spec.color,
-        emissiveIntensity: 0.08,
+        emissiveIntensity: 0.22,
       });
       ghostMesh = new THREE.Mesh(geo, mat);
       ghostMesh.renderOrder = 2;
@@ -498,15 +508,55 @@
       }
     }
 
-    function checkGameOver() {
+    function checkGameOver(dt) {
       if (gameOver) return;
+      let anyOver = false;
       for (const f of fruits) {
         const r = FRUITS[f.type].radius;
         if (f.body.position.y + r >= GAME_OVER_Y) {
+          anyOver = true;
+          break;
+        }
+      }
+      if (anyOver) {
+        gameOverDwell += dt;
+        if (gameOverDwell >= GAME_OVER_DWELL_SEC) {
           gameOver = true;
           overlay.classList.add('visible');
-          return;
         }
+      } else {
+        gameOverDwell = 0;
+      }
+    }
+
+    function updateDropLock(dt) {
+      if (dropAllowed || gameOver) return;
+      if (!lastDroppedBody) {
+        dropAllowed = true;
+        dropLockCalmSec = 0;
+        return;
+      }
+      const entry = fruits.find((f) => f.body === lastDroppedBody);
+      if (!entry) {
+        lastDroppedBody = null;
+        dropAllowed = true;
+        dropLockCalmSec = 0;
+        return;
+      }
+      const r = FRUITS[entry.type].radius;
+      const top = lastDroppedBody.position.y + r;
+      const belowSpawnBand = top < DROP_CENTER_Y - 0.04;
+      const calm = lastDroppedBody.velocity.lengthSquared() < 0.06;
+      if (calm) dropLockCalmSec += dt;
+      else dropLockCalmSec = 0;
+      const settled =
+        (belowSpawnBand && calm) ||
+        (calm && dropLockCalmSec > 0.28) ||
+        dropLockCalmSec > 1.2;
+      if (settled) {
+        dropAllowed = true;
+        lastDroppedBody = null;
+        dropLockCalmSec = 0;
       }
     }
 
@@ -518,6 +568,10 @@
       level = 1;
       levelScoreGoal = 200;
       gameOver = false;
+      gameOverDwell = 0;
+      dropAllowed = true;
+      lastDroppedBody = null;
+      dropLockCalmSec = 0;
       overlay.classList.remove('visible');
       syncHud();
       applyCupLayout();
@@ -526,14 +580,16 @@
     }
 
     function dropNext() {
-      if (gameOver) return;
+      if (gameOver || !dropAllowed) return;
       const t = pendingDropType();
       nextType++;
       const spec = FRUITS[t];
       const c = clampDropXZ(ghostPos.x, ghostPos.z, spec.radius);
       spawnFruit(t, c.x, DROP_CENTER_Y, ROW_Z);
       const last = fruits[fruits.length - 1];
-      last.body.velocity.set(0, -0.35, 0);
+      last.body.velocity.set(0, -0.28, 0);
+      lastDroppedBody = last.body;
+      dropAllowed = false;
       ensureGhostForType(pendingDropType());
     }
 
@@ -584,6 +640,8 @@
       }
       if (mergeCooldown > 0) mergeCooldown--;
 
+      updateDropLock(dt);
+
       for (const f of fruits) {
         f.body.position.z = ROW_Z;
         f.body.velocity.z = 0;
@@ -602,7 +660,7 @@
       }
 
       tryMerge();
-      checkGameOver();
+      checkGameOver(dt);
 
       renderer.render(scene, camera);
     }

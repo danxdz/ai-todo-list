@@ -8,7 +8,7 @@
   <title>3D fruit merge — minimal demo</title>
   <style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse 120% 80% at 50% 100%, #151a24 0%, #07080c 55%); font-family: system-ui, sans-serif; }
     #hud {
       position: fixed; left: 12px; top: 10px; z-index: 2;
       color: #eee; font-size: 14px; line-height: 1.45; max-width: 280px;
@@ -122,7 +122,7 @@
 
     // --- Three
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050508);
+    scene.background = new THREE.Color(0x0a0c10);
     scene.fog = null;
 
     /** Orthographic = fixed “2D” view (no orbit / perspective tilt) */
@@ -135,9 +135,9 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.42));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.92);
-    sun.position.set(0.8, 16, 10);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.52));
+    const sun = new THREE.DirectionalLight(0xfff4e6, 0.88);
+    sun.position.set(0.6, 18, 12);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.near = 0.5;
@@ -149,14 +149,23 @@
     scene.add(sun);
 
     const rimMat = new THREE.MeshStandardMaterial({
-      color: 0x0a0a0a,
-      metalness: 0.15,
-      roughness: 0.55,
+      color: 0x3d4f7c,
+      metalness: 0.35,
+      roughness: 0.38,
+      emissive: 0x1a2744,
+      emissiveIntensity: 0.25,
     });
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x0d0d0d,
-      metalness: 0.08,
-      roughness: 0.92,
+      color: 0x242b38,
+      metalness: 0.12,
+      roughness: 0.88,
+    });
+    const zoneBackMat = new THREE.MeshStandardMaterial({
+      color: 0x1e2636,
+      metalness: 0.05,
+      roughness: 0.95,
+      emissive: 0x121820,
+      emissiveIntensity: 0.4,
     });
 
     const cupGroup = new THREE.Group();
@@ -196,9 +205,17 @@
       const wh = CUP.wallH;
       const hx = CUP.halfX;
       const hz = CUP.halfZ;
-      const edgeT = 0.055;
+      const edgeT = 0.09;
+      const backZ = ROW_Z - 0.52;
 
-      const floorGeo = new THREE.PlaneGeometry(hx * 2 + 0.25, hz * 2 + 0.25);
+      const backW = hx * 2 + CUP.wallT * 2 + 0.55;
+      const backH = wh + 0.75;
+      const zoneBack = new THREE.Mesh(new THREE.PlaneGeometry(backW, backH), zoneBackMat);
+      zoneBack.position.set(0, wh * 0.5 - 0.08, backZ);
+      zoneBack.receiveShadow = true;
+      cupGroup.add(zoneBack);
+
+      const floorGeo = new THREE.PlaneGeometry(hx * 2 + 0.35, hz * 2 + 0.35);
       floorVis = new THREE.Mesh(floorGeo, floorMat);
       floorVis.rotation.x = -Math.PI / 2;
       floorVis.position.y = 0.002;
@@ -232,10 +249,10 @@
         opacity: 0.55,
         depthWrite: false,
       });
-      const lineGeo = new THREE.PlaneGeometry(hx * 2 - 0.06, 0.06);
+      const lineGeo = new THREE.PlaneGeometry(hx * 2 + 0.04, 0.1);
       dangerLine = new THREE.Mesh(lineGeo, lineMat);
       dangerLine.rotation.x = -Math.PI / 2;
-      dangerLine.position.set(0, GAME_OVER_Y + 0.01, ROW_Z);
+      dangerLine.position.set(0, GAME_OVER_Y + 0.01, ROW_Z + 0.02);
       cupGroup.add(dangerLine);
     }
 
@@ -282,36 +299,46 @@
     }
 
     function computeCupHeightForViewport() {
-      const minH = 9;
-      const maxH = 18;
-      const t = Math.min(1, innerHeight / 900);
+      const minH = 10;
+      const maxH = 20;
+      const t = Math.min(1, innerHeight / 700);
       return minH + (maxH - minH) * t;
     }
 
+    /**
+     * Bottom-anchored ortho: floor sits near bottom of screen (mobile portrait),
+     * cup scales to use vertical space; width grows with aspect so balls aren’t clipped.
+     */
     function fitCameraToCup() {
       const wh = CUP.wallH;
-      const hx = CUP.halfX + CUP.wallT + 0.22;
-      const minY = -0.65;
-      const maxY = Math.max(wh, DROP_CENTER_Y) + 0.5;
-      const contentH = maxY - minY;
-      const centerY = (minY + maxY) / 2;
-      const aspect = Math.max(0.35, innerWidth / innerHeight);
-      let viewH = contentH * 1.06;
-      let viewW = viewH * aspect;
-      const minW = hx * 2 * 1.12;
-      if (viewW < minW) {
-        viewW = minW;
-        viewH = viewW / aspect;
+      const hx = CUP.halfX + CUP.wallT + 0.28;
+      const playBottom = -0.28;
+      const playTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y) + 0.55;
+      const contentH = Math.max(6.5, playTop - playBottom);
+      const aspect = Math.max(0.28, innerWidth / innerHeight);
+      const minHalfW = hx * 1.08;
+
+      let viewH = contentH * 1.04;
+      let halfW = (viewH * aspect) / 2;
+      if (halfW < minHalfW) {
+        halfW = minHalfW;
+        viewH = (2 * halfW) / aspect;
       }
-      camera.left = -viewW / 2;
-      camera.right = viewW / 2;
-      camera.top = centerY + viewH / 2;
-      camera.bottom = centerY - viewH / 2;
-      camera.position.set(0, centerY, 18);
+      if (viewH < contentH * 1.02) {
+        viewH = contentH * 1.02;
+        halfW = Math.max(minHalfW, (viewH * aspect) / 2);
+      }
+
+      camera.bottom = playBottom;
+      camera.top = playBottom + viewH;
+      camera.left = -halfW;
+      camera.right = halfW;
+      const midY = (camera.top + camera.bottom) / 2;
+      camera.position.set(0, midY, 20);
       camera.up.set(0, 1, 0);
-      camera.lookAt(0, centerY, 0);
+      camera.lookAt(0, midY, 0);
       camera.near = 0.5;
-      camera.far = 60;
+      camera.far = 70;
       camera.updateProjectionMatrix();
     }
 
@@ -395,8 +422,10 @@
       const geo = new THREE.SphereGeometry(spec.radius, 32, 24);
       const mat = new THREE.MeshStandardMaterial({
         color: spec.color,
-        roughness: 0.34,
-        metalness: 0.1,
+        roughness: 0.42,
+        metalness: 0.06,
+        emissive: spec.color,
+        emissiveIntensity: 0.12,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = true;

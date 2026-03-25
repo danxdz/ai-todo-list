@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#1a2238" />
+  <meta name="theme-color" content="#3d2a5c" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>fruit-merge v61</title>
+  <title>Number Stack</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -18,9 +18,9 @@
       min-height: -webkit-fill-available;
       overflow: hidden;
       background:
-        linear-gradient(188deg, #283552 0%, #1c2638 22%, #141c2c 48%, #0c101c 72%, #06080f 100%),
-        radial-gradient(ellipse 95% 55% at 50% 0%, rgba(70, 100, 160, 0.18) 0%, transparent 58%),
-        #05070e;
+        linear-gradient(188deg, #4a3f6b 0%, #352850 28%, #241a3d 55%, #181028 82%, #0f0a18 100%),
+        radial-gradient(ellipse 95% 55% at 50% 0%, rgba(255, 180, 220, 0.12) 0%, transparent 58%),
+        #0c0814;
       font-family: system-ui, -apple-system, sans-serif;
     }
     body::before {
@@ -74,8 +74,19 @@
       color: rgba(140, 170, 220, 0.55);
       text-shadow: 0 0 12px rgba(80, 120, 200, 0.35);
     }
+    #numberTip {
+      color: rgba(255, 230, 250, 0.82);
+      font-size: 10px;
+      transition: opacity 0.35s ease;
+      max-width: min(200px, 40vw);
+      line-height: 1.35;
+      min-height: 2.4em;
+    }
+    #numberTip.tip-dim {
+      opacity: 0.4;
+    }
     .hud-brand strong {
-      background: linear-gradient(120deg, #b8d4ff, #7ab8ff);
+      background: linear-gradient(120deg, #ffd8a8, #ff9ec8);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -335,7 +346,7 @@
   <div id="floatFx" aria-hidden="true"></div>
   <div id="hud">
     <div class="hud-column">
-      <div class="hud-brand">ceramic stack <strong id="buildId">v61</strong></div>
+      <div class="hud-brand">number stack <strong id="buildId">let's add!</strong></div>
       <div class="hud-stat">
         <span class="hud-label">Score</span>
         <span class="hud-value" id="scoreVal">0</span>
@@ -349,29 +360,30 @@
         <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
       </div>
       <div class="hud-sub">Next <span id="nextLvlVal">200</span> pts</div>
-      <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Studio glaze · tier I</div>
+      <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Level 1 — Let's count!</div>
+      <div class="hud-sub" id="numberTip" style="margin-top:0.35rem"></div>
       <div class="hud-hint">
-        <a class="hud-link" href="numbers-merge-3d-demo.html" style="color:rgba(255,200,220,0.95)">Numbers →</a>
-        · <a class="hud-link" href="atoms-merge-3d-demo.html" style="color:rgba(180,220,255,0.9)">Atoms →</a>
-        · <a class="hud-link" href="index.html" style="color:rgba(160,190,230,0.75)">Menu</a><br />
+        <a class="hud-link" href="fruit-merge-3d-demo.html" style="color:rgba(255,210,180,0.95)">Marbles →</a>
+        · <a class="hud-link" href="atoms-merge-3d-demo.html" style="color:rgba(200,230,255,0.9)">Atoms →</a>
+        · <a class="hud-link" href="index.html" style="color:rgba(230,200,255,0.85)">Menu</a><br />
         <kbd>F</kbd> full
       </div>
     </div>
   </div>
   <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle" aria-hidden="true">
     <div id="overlayTitle">Game over</div>
-    <div id="overlaySub" style="font-size:55%;opacity:.9">Something crossed the red line</div>
+    <div id="overlaySub" style="font-size:55%;opacity:.9">The jar filled to the tippy top!</div>
     <div style="font-size:45%;opacity:.75;margin-top:8px">
       <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> on keyboard · or tap below
     </div>
     <button type="button" id="overlayRestart">Restart</button>
   </div>
   <div id="help">
-    Touch: slide, <strong>release to drop</strong> · Mouse: drag, release<br />
-    Combo · jackpot · <kbd>R</kbd> · <kbd>F</kbd> · <kbd>D</kbd> ·
-    <a class="help-link" href="numbers-merge-3d-demo.html" style="color:#ffc8e0">Number stack</a> ·
-    <a class="help-link" href="atoms-merge-3d-demo.html" style="color:#a8d4ff">Atoms</a> ·
-    <a class="help-link" href="index.html" style="color:#9ab8e0">Menu</a>
+    Same number + same number = <strong>add them up!</strong> · Twin biggest = sparkle jackpot<br />
+    <kbd>R</kbd> restart · <kbd>F</kbd> full · <kbd>D</kbd> debug ·
+    <a class="help-link" href="fruit-merge-3d-demo.html" style="color:#ffc8a8">Marbles</a> ·
+    <a class="help-link" href="atoms-merge-3d-demo.html" style="color:#a8e8ff">Atoms</a> ·
+    <a class="help-link" href="index.html" style="color:#e8c8ff">Menu</a>
   </div>
 
   <div class="phys-dbg-wrap" id="physDbgWrap">
@@ -473,7 +485,7 @@
       LEVEL_GOAL_SCALE,
       LEVEL_GOAL_ADD,
       GAME_OVER_BELOW_RIM,
-    } from './js/config.js';
+    } from './js/config-numbers.js';
     import { createSfx } from './js/sfx.js';
     import { createJuice } from './js/effects.js';
     import { physicsTuning, createPhysicsWorld, applyPhysicsPreset } from './js/physics.js';
@@ -497,6 +509,7 @@
     const levelEl = document.getElementById('levelVal');
     const nextLvlEl = document.getElementById('nextLvlVal');
     const tierHookEl = document.getElementById('tierHook');
+    const numberTipEl = document.getElementById('numberTip');
     const panicEl = document.getElementById('danger-panic');
     const floatFxEl = document.getElementById('floatFx');
     const overlay = document.getElementById('overlay');
@@ -529,11 +542,28 @@
     let heartbeatAcc = 0;
 
     function tierLabelForLevel(lv) {
-      if (lv >= 10) return 'Obsidian kiln · tier IV';
-      if (lv >= 7) return 'Raku crackle · tier III';
-      if (lv >= 4) return 'Porcelain blue · tier II';
-      return 'Studio glaze · tier I';
+      return `Level ${lv} — Let's count!`;
     }
+
+    let numberTipTimer = 0;
+    function showNumberTip(text) {
+      if (!numberTipEl || !text) return;
+      if (numberTipTimer) window.clearTimeout(numberTipTimer);
+      numberTipEl.classList.remove('tip-dim');
+      numberTipEl.textContent = text;
+      numberTipTimer = window.setTimeout(() => {
+        numberTipEl.classList.add('tip-dim');
+      }, 4800);
+    }
+
+    function typeIndexForNumber(n) {
+      for (let i = 0; i < FRUITS.length; i++) {
+        if (FRUITS[i].number === n) return i;
+      }
+      return -1;
+    }
+
+    const TWIN_TEN_TYPE = FRUITS.findIndex((f) => f.number === 10);
 
     function updatePanicVisuals(stress) {
       if (!panicEl) return;
@@ -762,68 +792,9 @@
     renderer.toneMappingExposure = 1.08;
 
     let fruitSharedTextures = null;
+    const elementFaceTextures = [];
 
     function buildFruitSharedTextures() {
-      const s = 256;
-      const cm = document.createElement('canvas');
-      cm.width = s;
-      cm.height = s;
-      const mx = cm.getContext('2d');
-      const base = mx.createRadialGradient(s * 0.5, s * 0.5, s * 0.08, s * 0.5, s * 0.5, s * 0.55);
-      base.addColorStop(0, '#f8f8fc');
-      base.addColorStop(0.45, '#e8e8f0');
-      base.addColorStop(1, '#d4d4e0');
-      mx.fillStyle = base;
-      mx.fillRect(0, 0, s, s);
-      mx.globalAlpha = 0.07;
-      for (let i = 0; i < 3200; i++) {
-        mx.fillStyle = `rgba(60,55,78,${0.08 + Math.random() * 0.12})`;
-        mx.beginPath();
-        mx.arc(Math.random() * s, Math.random() * s, 0.4 + Math.random() * 1.8, 0, Math.PI * 2);
-        mx.fill();
-      }
-      mx.globalAlpha = 1;
-      mx.lineCap = 'round';
-      mx.lineJoin = 'round';
-      for (let v = 0; v < 7; v++) {
-        mx.strokeStyle = `rgba(255,255,255,${0.045 + Math.random() * 0.05})`;
-        mx.lineWidth = 2.2 + Math.random() * 2.8;
-        mx.beginPath();
-        let x = Math.random() * s;
-        let y = Math.random() * s;
-        mx.moveTo(x, y);
-        for (let k = 0; k < 6; k++) {
-          const cx = x + (Math.random() - 0.3) * 50;
-          const cy = y + (Math.random() - 0.5) * 55;
-          const nx = cx + (Math.random() - 0.5) * 45;
-          const ny = cy + (Math.random() - 0.4) * 50;
-          mx.quadraticCurveTo(cx, cy, nx, ny);
-          x = nx;
-          y = ny;
-        }
-        mx.stroke();
-      }
-      for (let v = 0; v < 5; v++) {
-        mx.strokeStyle = `rgba(45,42,58,${0.04 + Math.random() * 0.06})`;
-        mx.lineWidth = 1.2 + Math.random() * 1.8;
-        mx.beginPath();
-        let x = Math.random() * s;
-        let y = Math.random() * s;
-        mx.moveTo(x, y);
-        for (let k = 0; k < 5; k++) {
-          const cx = x + (Math.random() - 0.5) * 42;
-          const cy = y + (Math.random() - 0.5) * 48;
-          const nx = cx + (Math.random() - 0.5) * 40;
-          const ny = cy + (Math.random() - 0.5) * 44;
-          mx.quadraticCurveTo(cx, cy, nx, ny);
-          x = nx;
-          y = ny;
-        }
-        mx.stroke();
-      }
-      const marbleMap = new THREE.CanvasTexture(cm);
-      marbleMap.colorSpace = THREE.SRGBColorSpace;
-
       const n2 = 128;
       const c2 = document.createElement('canvas');
       c2.width = n2;
@@ -840,8 +811,41 @@
       roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
       roughnessMap.repeat.set(3, 3);
       roughnessMap.colorSpace = THREE.NoColorSpace;
+      return { roughnessMap };
+    }
 
-      return { marbleMap, roughnessMap };
+    function numberFaceMap(type) {
+      if (elementFaceTextures[type]) return elementFaceTextures[type];
+      const spec = FRUITS[type];
+      const s = 256;
+      const c = document.createElement('canvas');
+      c.width = s;
+      c.height = s;
+      const ctx = c.getContext('2d');
+      const tc = new THREE.Color(spec.color);
+      const g = ctx.createRadialGradient(s * 0.4, s * 0.35, s * 0.08, s * 0.5, s * 0.5, s * 0.65);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.4, `#${tc.getHexString()}`);
+      g.addColorStop(1, '#222222');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+      const numStr = String(spec.number);
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ffffff';
+      const numSize = numStr.length >= 2 ? 88 : 108;
+      ctx.font = `900 ${numSize}px system-ui, "Segoe UI", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(numStr, s / 2, s / 2 + 8);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = '600 18px system-ui, sans-serif';
+      ctx.fillText(spec.fact, s / 2, s * 0.78);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      elementFaceTextures[type] = tex;
+      return tex;
     }
 
     function initFruitVisuals() {
@@ -853,17 +857,18 @@
       return 0.02 + tNorm * 0.025;
     }
 
-    /** Glassy game marbles: IBL + slight transmission on edges; ghost = preview */
+    /** Number spheres: big digit + cheer line; ghost = queue preview */
     function makeFruitMaterial(type, { ghost = false } = {}) {
       initFruitVisuals();
       const spec = FRUITS[type];
       const tNorm = FRUITS.length > 1 ? type / (FRUITS.length - 1) : 0;
-      const { marbleMap, roughnessMap } = fruitSharedTextures;
+      const { roughnessMap } = fruitSharedTextures;
+      const faceMap = numberFaceMap(type);
 
       if (ghost) {
         return new THREE.MeshPhysicalMaterial({
-          color: spec.color,
-          map: marbleMap,
+          color: 0xffffff,
+          map: faceMap,
           roughnessMap,
           roughness: 0.18,
           metalness: 0,
@@ -883,21 +888,21 @@
       }
 
       return new THREE.MeshPhysicalMaterial({
-        color: spec.color,
-        map: marbleMap,
+        color: 0xffffff,
+        map: faceMap,
         roughnessMap,
-        roughness: 0.26,
+        roughness: 0.22,
         metalness: 0,
-        transmission: 0.14 + tNorm * 0.1,
-        thickness: 0.55 + tNorm * 0.35,
-        ior: 1.54,
+        transmission: 0.18 + tNorm * 0.08,
+        thickness: 0.55 + tNorm * 0.32,
+        ior: 1.52,
         specularIntensity: 1,
         specularColor: new THREE.Color(0xffffff),
-        clearcoat: 0.42,
+        clearcoat: 0.38,
         clearcoatRoughness: 0.12,
         attenuationColor: spec.color,
-        attenuationDistance: 0.55 + tNorm * 0.45,
-        emissive: 0x181820,
+        attenuationDistance: 0.55 + tNorm * 0.42,
+        emissive: spec.color,
         emissiveIntensity: fruitIdleEmissiveIntensity(type),
         envMapIntensity: 1.05,
         depthWrite: true,
@@ -1433,7 +1438,7 @@
     function tryMerge() {
       if (mergeCooldown > 0 || gameOver) return;
       const MAX_TYPE = FRUITS.length - 1;
-      /** Biggest tier has nothing above it — Suika-style: two touching vanish + jackpot (frees space). */
+      /** Biggest tier (12): twin touching → jackpot (no 24 on the table). */
       const JACKPOT_MERGE_PTS = MERGE_POINTS[MAX_TYPE] * 5 + 180;
 
       for (let i = 0; i < fruits.length; i++) {
@@ -1465,11 +1470,55 @@
           beginJackpotVanish(b);
           addScore(jpPts, { skipScorePulse: true });
           popFloatText(`★ +${jpPts}`, jx, jy, ROW_Z + 0.42, { jackpot: true, color: '#ffe8a8' });
+          showNumberTip('Twin twelves — mega sparkle jackpot!');
           flashHudMerge(scoreEl);
           Sfx.playJackpot(jackHeat);
           vibrateJackpot(jackHeat);
           mergeCooldown = 14;
           return;
+        }
+      }
+
+      /** Two 10s → 20 (no ball); clear with a fun burst so the jar doesn’t jam. */
+      if (TWIN_TEN_TYPE >= 0) {
+        const TEN_JP_PTS = MERGE_POINTS[TWIN_TEN_TYPE] * 4 + 120;
+        for (let i = 0; i < fruits.length; i++) {
+          for (let j = i + 1; j < fruits.length; j++) {
+            const a = fruits[i];
+            const b = fruits[j];
+            if (a.type !== TWIN_TEN_TYPE || b.type !== TWIN_TEN_TYPE) continue;
+            const r10 = FRUITS[TWIN_TEN_TYPE].radius;
+            const touch = r10 + r10;
+            const dist = Math.hypot(
+              a.body.position.x - b.body.position.x,
+              a.body.position.y - b.body.position.y,
+            );
+            if (dist > touch * JACKPOT_MERGE_DIST_MULT) continue;
+            const nowJp = performance.now();
+            const chainJp =
+              nowJp - lastMergeAtMs <= COMBO_CHAIN_SEC * 1000 ? comboChain : 0;
+            const jm = mergeComboMultBeforeBump();
+            bumpMergeCombo();
+            const jx = (a.body.position.x + b.body.position.x) / 2;
+            const jy = (a.body.position.y + b.body.position.y) / 2;
+            const jackHeat = 1 + chainJp * 0.18 + (jm - 1) * 0.28;
+            const jBurst = Math.min(100, 44 + chainJp * 18 + Math.floor((jm - 1) * 14));
+            const jBoost = 1 + chainJp * 0.09 + (jm - 1) * 0.12;
+            const jpPts = scoreWithMultiplier(TEN_JP_PTS, jm);
+            juice.burst(jx, jy, ROW_Z + 0.02, FRUITS[TWIN_TEN_TYPE].color, jBurst, jBoost, 'jackpot');
+            juice.burstSparks(jx, jy, ROW_Z + 0.05, FRUITS[TWIN_TEN_TYPE].color, 24);
+            queueHitPause(0.08);
+            beginJackpotVanish(a);
+            beginJackpotVanish(b);
+            addScore(jpPts, { skipScorePulse: true });
+            popFloatText('Wow! Big 10!', jx, jy, ROW_Z + 0.42, { jackpot: true, color: '#fff4c8' });
+            showNumberTip('10 + 10 is 20 — too big for one ball, so we celebrate instead!');
+            flashHudMerge(scoreEl);
+            Sfx.playJackpot(jackHeat);
+            vibrateJackpot(jackHeat);
+            mergeCooldown = 14;
+            return;
+          }
         }
       }
 
@@ -1485,13 +1534,15 @@
           const dist = a.body.position.distanceTo(b.body.position);
           if (dist > touch * MERGE_DIST_MULT) continue;
 
+          const newNumber = FRUITS[a.type].number + FRUITS[b.type].number;
+          const newType = typeIndexForNumber(newNumber);
+          if (newType === -1) continue;
+
           const nx = (a.body.position.x + b.body.position.x) / 2;
           const ny = (a.body.position.y + b.body.position.y) / 2;
-          const newType = a.type + 1;
           const rNew = FRUITS[newType].radius;
           const lim = innerHalfXForRadius(rNew);
           const cx = Math.max(-lim, Math.min(lim, nx));
-          /** Spawn from lowest parent bottom so the new sphere “sits” on support instead of popping the stack */
           const bottomA = a.body.position.y - ra;
           const bottomB = b.body.position.y - rb;
           const mergeBottom = Math.min(bottomA, bottomB);
@@ -1505,7 +1556,6 @@
           const s = physicsTuning.mergeVelScale;
           let mvx = (ma * va.x + mb * vb.x) * invSum * s;
           let mvy = (ma * va.y + mb * vb.y) * invSum * s;
-          /** Kill most upward kick from merges under a pile */
           mvx *= 0.72;
           mvy *= mvy > 0 ? 0.22 : 0.62;
 
@@ -1537,10 +1587,12 @@
           merged.body.angularVelocity.set(0, 0, 0);
           addScore(mergePts, { skipScorePulse: true });
           {
-            const fc = new THREE.Color(FRUITS[newType].color);
-            popFloatText(`+${mergePts}`, nx, ny + FRUITS[newType].radius * 0.42, ROW_Z + 0.48, {
+            const el = FRUITS[newType];
+            const fc = new THREE.Color(el.color);
+            popFloatText(`+${mergePts} → ${el.number}`, nx, ny + el.radius * 0.42, ROW_Z + 0.48, {
               color: `#${fc.getHexString()}`,
             });
+            showNumberTip(`${el.number}: ${el.fact}`);
           }
           flashHudMerge(scoreEl);
           Sfx.playMerge(newType, mult);
@@ -1595,6 +1647,11 @@
       cancelVibration();
       updatePanicVisuals(0);
       if (floatFxEl) floatFxEl.replaceChildren();
+      if (numberTipEl) {
+        if (numberTipTimer) window.clearTimeout(numberTipTimer);
+        numberTipEl.textContent = '';
+        numberTipEl.classList.remove('tip-dim');
+      }
       syncHud();
       aimPromoteActive = false;
       aimPromoteElapsed = 0;

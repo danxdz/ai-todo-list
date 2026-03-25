@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#1a2238" />
+  <meta name="theme-color" content="#0d1f14" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>fruit-merge v61</title>
+  <title>Periodic Stack — Atomic merge</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -18,9 +18,9 @@
       min-height: -webkit-fill-available;
       overflow: hidden;
       background:
-        linear-gradient(188deg, #283552 0%, #1c2638 22%, #141c2c 48%, #0c101c 72%, #06080f 100%),
-        radial-gradient(ellipse 95% 55% at 50% 0%, rgba(70, 100, 160, 0.18) 0%, transparent 58%),
-        #05070e;
+        linear-gradient(188deg, #1a3028 0%, #122218 35%, #0a1810 65%, #050c08 100%),
+        radial-gradient(ellipse 95% 55% at 50% 0%, rgba(80, 200, 140, 0.12) 0%, transparent 55%),
+        #040a06;
       font-family: system-ui, -apple-system, sans-serif;
     }
     body::before {
@@ -32,7 +32,7 @@
       background:
         radial-gradient(ellipse 100% 85% at 50% 50%, transparent 0%, rgba(4, 8, 18, 0.65) 65%, rgba(2, 4, 10, 0.92) 100%),
         radial-gradient(circle at 15% 25%, rgba(100, 140, 200, 0.05) 0%, transparent 38%),
-        radial-gradient(circle at 88% 20%, rgba(200, 120, 80, 0.04) 0%, transparent 36%);
+        radial-gradient(circle at 88% 20%, rgba(120, 220, 160, 0.05) 0%, transparent 36%);
       animation: bgAura 18s ease-in-out infinite alternate;
     }
     @keyframes bgAura {
@@ -45,8 +45,8 @@
       z-index: 2;
       pointer-events: none;
       background:
-        radial-gradient(ellipse 72% 58% at 50% 44%, transparent 18%, rgba(90, 0, 0, 0.12) 48%, rgba(28, 0, 0, 0.62) 100%),
-        radial-gradient(ellipse 100% 100% at 50% 50%, transparent 42%, rgba(60, 0, 0, 0.35) 100%);
+        radial-gradient(ellipse 72% 58% at 50% 44%, transparent 18%, rgba(200, 120, 0, 0.14) 48%, rgba(40, 30, 0, 0.55) 100%),
+        radial-gradient(ellipse 100% 100% at 50% 50%, transparent 42%, rgba(80, 60, 0, 0.3) 100%);
       opacity: 0;
       transition: opacity 0.14s linear;
       mix-blend-mode: multiply;
@@ -204,21 +204,23 @@
       font-size: 10px;
       color: rgba(150, 170, 200, 0.45);
     }
-    .hud-link {
+    .hud-link, .help-link {
       pointer-events: auto;
+      color: rgba(160, 230, 190, 0.85);
       text-decoration: none;
       font-weight: 600;
     }
-    .hud-link:hover {
+    .hud-link:hover, .help-link:hover {
       text-decoration: underline;
+      color: #b8ffd0;
     }
-    .help-link {
-      pointer-events: auto;
-      text-decoration: none;
-      font-weight: 600;
+    #atomFact {
+      color: rgba(170, 220, 200, 0.75);
+      font-size: 9px;
+      transition: opacity 0.35s ease;
     }
-    .help-link:hover {
-      text-decoration: underline;
+    #atomFact.fact-dim {
+      opacity: 0.35;
     }
     .hud-value.combo-blazing {
       animation: comboBlaze 0.55s ease-in-out infinite alternate, hudValueShine 5s ease-in-out infinite;
@@ -328,14 +330,207 @@
       cursor: pointer; color: #8aa8d8; font-size: 11px; margin-bottom: 8px; user-select: none;
     }
     .phys-fine-tune summary::-webkit-details-marker { color: #7ab8ff; }
+    .hud-disc-btn {
+      pointer-events: auto;
+      margin-top: 0.45rem;
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #0c1812;
+      background: linear-gradient(165deg, rgba(180, 255, 210, 0.95), rgba(100, 200, 150, 0.88));
+      border: 1px solid rgba(120, 220, 170, 0.5);
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+      box-shadow: 0 2px 12px rgba(60, 140, 100, 0.35);
+    }
+    .hud-disc-btn:active { transform: scale(0.97); }
+    #confettiHost {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 19;
+      overflow: hidden;
+    }
+    .confetti-bit {
+      position: absolute;
+      width: 7px;
+      height: 10px;
+      border-radius: 2px;
+      margin-left: -4px;
+      margin-top: -5px;
+      animation: confettiPop 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes confettiPop {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      100% {
+        transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.2);
+        opacity: 0;
+      }
+    }
+    #discoveryOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 18;
+      align-items: center;
+      justify-content: center;
+      padding: max(16px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+      background: rgba(4, 10, 8, 0.82);
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+    #discoveryOverlay.visible {
+      display: flex;
+      flex-direction: column;
+    }
+    .disc-panel {
+      width: min(420px, 100%);
+      max-height: min(78dvh, 560px);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(168deg, rgba(22, 42, 34, 0.97), rgba(10, 22, 16, 0.98));
+      border: 1px solid rgba(100, 200, 150, 0.28);
+      border-radius: 16px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    .disc-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(80, 140, 110, 0.25);
+    }
+    .disc-head h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #d8f5e4;
+    }
+    .disc-head p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: rgba(160, 210, 180, 0.75);
+      line-height: 1.4;
+    }
+    .disc-close {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(40, 70, 55, 0.6);
+      color: #c8eed8;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .disc-close:active { transform: scale(0.95); }
+    .disc-progress-wrap {
+      padding: 0 16px 10px;
+    }
+    .disc-progress-bar {
+      height: 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+    .disc-progress-fill {
+      height: 100%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #4fc3a1, #81d4fa);
+      transition: width 0.35s ease;
+    }
+    .disc-progress-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(140, 200, 170, 0.9);
+      margin-bottom: 6px;
+    }
+    .disc-grid-wrap {
+      flex: 1;
+      overflow: auto;
+      padding: 8px 12px 14px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .disc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+      gap: 10px;
+    }
+    .disc-card {
+      position: relative;
+      border: none;
+      border-radius: 12px;
+      padding: 8px 6px 10px;
+      cursor: pointer;
+      text-align: center;
+      color: #fff;
+      min-height: 118px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+      touch-action: manipulation;
+    }
+    .disc-card:active { transform: scale(0.97); }
+    .disc-card.locked {
+      filter: grayscale(0.85) brightness(0.45);
+      box-shadow: none;
+    }
+    .disc-card.unlocked {
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 4px 20px rgba(100, 200, 255, 0.15);
+    }
+    .disc-card.selected {
+      box-shadow: 0 0 0 2px rgba(180, 255, 220, 0.65), 0 6px 24px rgba(80, 200, 150, 0.25);
+    }
+    .disc-card canvas {
+      display: block;
+      border-radius: 50%;
+      width: 52px;
+      height: 52px;
+    }
+    .disc-card .disc-z {
+      font-size: 9px;
+      opacity: 0.65;
+      font-weight: 600;
+    }
+    .disc-card .disc-sym {
+      font-size: 13px;
+      font-weight: 800;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+    .disc-detail {
+      padding: 10px 16px 14px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: rgba(200, 230, 210, 0.88);
+      border-top: 1px solid rgba(80, 140, 110, 0.22);
+      min-height: 3.2em;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .disc-detail em {
+      color: rgba(150, 190, 170, 0.65);
+      font-style: normal;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
   <div id="danger-panic" aria-hidden="true"></div>
+  <div id="confettiHost" aria-hidden="true"></div>
   <div id="floatFx" aria-hidden="true"></div>
   <div id="hud">
     <div class="hud-column">
-      <div class="hud-brand">ceramic stack <strong id="buildId">v61</strong></div>
+      <div class="hud-brand">Periodic Stack <strong id="buildId">Atomic merge</strong></div>
       <div class="hud-stat">
         <span class="hud-label">Score</span>
         <span class="hud-value" id="scoreVal">0</span>
@@ -349,29 +544,48 @@
         <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
       </div>
       <div class="hud-sub">Next <span id="nextLvlVal">200</span> pts</div>
-      <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Studio glaze · tier I</div>
+      <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Period 1 · light elements</div>
+      <div class="hud-sub" id="atomFact" style="margin-top:0.35rem;max-width:min(200px,40vw);line-height:1.35;min-height:2.6em"></div>
       <div class="hud-hint">
-        <a class="hud-link" href="numbers-merge-3d-demo.html" style="color:rgba(255,200,220,0.95)">Numbers →</a>
-        · <a class="hud-link" href="atoms-merge-3d-demo.html" style="color:rgba(180,220,255,0.9)">Atoms →</a>
-        · <a class="hud-link" href="index.html" style="color:rgba(160,190,230,0.75)">Menu</a><br />
+        <button type="button" class="hud-disc-btn" id="discOpenBtn">Discovered elements</button><br />
+        <a class="hud-link" href="numbers-merge-3d-demo.html">Number stack →</a><br />
+        <a class="hud-link" href="fruit-merge-3d-demo.html">Marble game →</a><br />
         <kbd>F</kbd> full
       </div>
     </div>
   </div>
   <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle" aria-hidden="true">
     <div id="overlayTitle">Game over</div>
-    <div id="overlaySub" style="font-size:55%;opacity:.9">Something crossed the red line</div>
+    <div id="overlaySub" style="font-size:55%;opacity:.9">Reactor column hit critical fill</div>
+    <div id="overlayDiscover" style="font-size:42%;opacity:.88;max-width:min(340px,88vw);line-height:1.45;margin-top:6px"></div>
     <div style="font-size:45%;opacity:.75;margin-top:8px">
       <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> on keyboard · or tap below
     </div>
     <button type="button" id="overlayRestart">Restart</button>
   </div>
   <div id="help">
-    Touch: slide, <strong>release to drop</strong> · Mouse: drag, release<br />
-    Combo · jackpot · <kbd>R</kbd> · <kbd>F</kbd> · <kbd>D</kbd> ·
-    <a class="help-link" href="numbers-merge-3d-demo.html" style="color:#ffc8e0">Number stack</a> ·
-    <a class="help-link" href="atoms-merge-3d-demo.html" style="color:#a8d4ff">Atoms</a> ·
-    <a class="help-link" href="index.html" style="color:#9ab8e0">Menu</a>
+    Drop · merge · fuse — don’t overload the reactor · <strong>fusion jackpot</strong> on twin heaviest<br />
+    <kbd>R</kbd> restart · <kbd>F</kbd> full · <a class="help-link" href="#" id="helpDiscLink">Discovered</a> · <a class="help-link" href="numbers-merge-3d-demo.html">Numbers</a> · <a class="help-link" href="fruit-merge-3d-demo.html">Marbles</a> · <a class="help-link" href="index.html">Menu</a>
+  </div>
+
+  <div id="discoveryOverlay" role="dialog" aria-modal="true" aria-labelledby="discTitle" aria-hidden="true">
+    <div class="disc-panel">
+      <div class="disc-head">
+        <div>
+          <h2 id="discTitle">Discovered elements</h2>
+          <p>Unlock by dropping or merging — tap a card to read its fact again.</p>
+        </div>
+        <button type="button" class="disc-close" id="discCloseBtn" aria-label="Close">×</button>
+      </div>
+      <div class="disc-progress-wrap">
+        <div class="disc-progress-label" id="discProgressLabel">0 / 18 discovered</div>
+        <div class="disc-progress-bar"><div class="disc-progress-fill" id="discProgressFill" style="width:0%"></div></div>
+      </div>
+      <div class="disc-grid-wrap">
+        <div class="disc-grid" id="discGrid"></div>
+      </div>
+      <div class="disc-detail" id="discDetail"><em>Tap an unlocked element to see its fact.</em></div>
+    </div>
   </div>
 
   <div class="phys-dbg-wrap" id="physDbgWrap">
@@ -473,7 +687,14 @@
       LEVEL_GOAL_SCALE,
       LEVEL_GOAL_ADD,
       GAME_OVER_BELOW_RIM,
-    } from './js/config.js';
+    } from './js/config-atoms.js';
+    import { drawElementFace2d } from './js/atoms-element-face.js';
+    import {
+      touchDiscoveredAtomicNumber,
+      discoveredCount,
+      newUnlocksTodayCount,
+      loadDiscoveredAtomicNumbers,
+    } from './js/atoms-discovery.js';
     import { createSfx } from './js/sfx.js';
     import { createJuice } from './js/effects.js';
     import { physicsTuning, createPhysicsWorld, applyPhysicsPreset } from './js/physics.js';
@@ -497,10 +718,21 @@
     const levelEl = document.getElementById('levelVal');
     const nextLvlEl = document.getElementById('nextLvlVal');
     const tierHookEl = document.getElementById('tierHook');
+    const atomFactEl = document.getElementById('atomFact');
     const panicEl = document.getElementById('danger-panic');
     const floatFxEl = document.getElementById('floatFx');
     const overlay = document.getElementById('overlay');
     const overlayRestart = document.getElementById('overlayRestart');
+    const overlayDiscoverEl = document.getElementById('overlayDiscover');
+    const discoveryOverlay = document.getElementById('discoveryOverlay');
+    const discOpenBtn = document.getElementById('discOpenBtn');
+    const discCloseBtn = document.getElementById('discCloseBtn');
+    const discGrid = document.getElementById('discGrid');
+    const discProgressLabel = document.getElementById('discProgressLabel');
+    const discProgressFill = document.getElementById('discProgressFill');
+    const discDetail = document.getElementById('discDetail');
+    const confettiHost = document.getElementById('confettiHost');
+    const helpDiscLink = document.getElementById('helpDiscLink');
 
     let score = 0;
     let level = 1;
@@ -514,6 +746,176 @@
 
     const Sfx = createSfx();
     document.body.addEventListener('pointerdown', () => Sfx.resume(), { passive: true });
+
+    const TOTAL_ELEMENTS = FRUITS.length;
+    /** @type {number[]} atomic numbers first unlocked ever during this run */
+    let runFirstEverZs = [];
+    let discoveryOpen = false;
+
+    function hexBgFromSpecColor(hex) {
+      const r = (hex >> 16) & 255;
+      const g = (hex >> 8) & 255;
+      const b = hex & 255;
+      return `linear-gradient(165deg, rgba(${r},${g},${b},0.95), rgba(${Math.max(0, r - 40)},${Math.max(0, g - 40)},${Math.max(0, b - 40)},0.92))`;
+    }
+
+    function spawnMiniConfetti() {
+      if (!confettiHost) return;
+      const colors = ['#64b5f6', '#ffee58', '#ef5350', '#81c784', '#7e57c2', '#ff8a65', '#ffffff'];
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight * 0.36;
+      for (let i = 0; i < 24; i++) {
+        const el = document.createElement('span');
+        el.className = 'confetti-bit';
+        el.style.background = colors[i % colors.length];
+        el.style.left = `${cx}px`;
+        el.style.top = `${cy}px`;
+        el.style.setProperty('--dx', `${(Math.random() - 0.5) * 200}px`);
+        el.style.setProperty('--dy', `${-70 - Math.random() * 140}px`);
+        el.style.setProperty('--rot', `${(Math.random() - 0.5) * 540}deg`);
+        confettiHost.appendChild(el);
+        window.setTimeout(() => el.remove(), 1100);
+      }
+    }
+
+    function syncDiscoveryProgressUI() {
+      const n = discoveredCount();
+      if (discProgressLabel) discProgressLabel.textContent = `${n} / ${TOTAL_ELEMENTS} discovered`;
+      if (discProgressFill) discProgressFill.style.width = `${(n / TOTAL_ELEMENTS) * 100}%`;
+    }
+
+    function paintDiscCardCanvas(canvas, tier) {
+      const spec = FRUITS[tier];
+      const s = 104;
+      canvas.width = s;
+      canvas.height = s;
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2);
+      ctx.clip();
+      drawElementFace2d(ctx, s, spec);
+    }
+
+    function buildDiscoveryGrid() {
+      if (!discGrid) return;
+      discGrid.replaceChildren();
+      const discovered = loadDiscoveredAtomicNumbers();
+      for (let tier = 0; tier < FRUITS.length; tier++) {
+        const spec = FRUITS[tier];
+        const z = spec.atomicNumber;
+        const unlocked = discovered.has(z);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `disc-card ${unlocked ? 'unlocked' : 'locked'}`;
+        btn.dataset.tier = String(tier);
+        btn.style.background = hexBgFromSpecColor(spec.color);
+        const cv = document.createElement('canvas');
+        cv.setAttribute('width', '104');
+        cv.setAttribute('height', '104');
+        paintDiscCardCanvas(cv, tier);
+        const zEl = document.createElement('div');
+        zEl.className = 'disc-z';
+        zEl.textContent = `#${z}`;
+        const symEl = document.createElement('div');
+        symEl.className = 'disc-sym';
+        symEl.textContent = spec.symbol;
+        btn.appendChild(cv);
+        btn.appendChild(zEl);
+        btn.appendChild(symEl);
+        btn.addEventListener('click', () => {
+          if (!loadDiscoveredAtomicNumbers().has(z)) {
+            if (discDetail) discDetail.innerHTML = '<em>Not discovered yet — merge or drop this element!</em>';
+            return;
+          }
+          discGrid.querySelectorAll('.disc-card').forEach((c) => c.classList.remove('selected'));
+          btn.classList.add('selected');
+          if (discDetail) discDetail.textContent = `${spec.name} (${spec.symbol}): ${spec.fact}`;
+        });
+        discGrid.appendChild(btn);
+      }
+      syncDiscoveryProgressUI();
+    }
+
+    function refreshDiscoveryGrid() {
+      if (!discGrid || !discGrid.children.length) {
+        buildDiscoveryGrid();
+        return;
+      }
+      const discovered = loadDiscoveredAtomicNumbers();
+      discGrid.querySelectorAll('.disc-card').forEach((btn) => {
+        const tier = Number(btn.dataset.tier);
+        const z = FRUITS[tier].atomicNumber;
+        const unlocked = discovered.has(z);
+        btn.classList.toggle('unlocked', unlocked);
+        btn.classList.toggle('locked', !unlocked);
+      });
+      syncDiscoveryProgressUI();
+    }
+
+    function openDiscovery() {
+      discoveryOpen = true;
+      if (discoveryOverlay) {
+        discoveryOverlay.classList.add('visible');
+        discoveryOverlay.setAttribute('aria-hidden', 'false');
+      }
+      refreshDiscoveryGrid();
+      discCloseBtn?.focus({ preventScroll: true });
+    }
+
+    function closeDiscovery() {
+      discoveryOpen = false;
+      if (discoveryOverlay) {
+        discoveryOverlay.classList.remove('visible');
+        discoveryOverlay.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    discOpenBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      Sfx.resume();
+      openDiscovery();
+    });
+    discCloseBtn?.addEventListener('click', () => closeDiscovery());
+    discoveryOverlay?.addEventListener('click', (e) => {
+      if (e.target === discoveryOverlay) closeDiscovery();
+    });
+    helpDiscLink?.addEventListener('click', (e) => {
+      e.preventDefault();
+      Sfx.resume();
+      openDiscovery();
+    });
+
+    /**
+     * @param {number} z atomic number
+     */
+    function noteElementDiscovered(z) {
+      const { firstEver } = touchDiscoveredAtomicNumber(z);
+      if (firstEver) {
+        runFirstEverZs.push(z);
+        spawnMiniConfetti();
+      }
+      if (discoveryOpen) refreshDiscoveryGrid();
+    }
+
+    function gameOverDiscoveryMessage() {
+      if (!overlayDiscoverEl) return;
+      const total = discoveredCount();
+      const runN = runFirstEverZs.length;
+      const todayN = newUnlocksTodayCount();
+      let html = `Collection: <strong>${total} / ${TOTAL_ELEMENTS}</strong> elements`;
+      if (runN > 0) {
+        html += `<br />New this run: <strong>${runN}</strong>`;
+      }
+      if (todayN > 0) {
+        html += `<br />New elements unlocked today: <strong>${todayN}</strong>`;
+      }
+      if (runN === 0 && total > 0) {
+        html += `<br /><span style="opacity:.9">Keep merging to fill the table!</span>`;
+      }
+      overlayDiscoverEl.innerHTML = html;
+    }
+
+    buildDiscoveryGrid();
 
     const comboMultEl = document.getElementById('comboMultVal');
     let comboChain = 0;
@@ -529,10 +931,21 @@
     let heartbeatAcc = 0;
 
     function tierLabelForLevel(lv) {
-      if (lv >= 10) return 'Obsidian kiln · tier IV';
-      if (lv >= 7) return 'Raku crackle · tier III';
-      if (lv >= 4) return 'Porcelain blue · tier II';
-      return 'Studio glaze · tier I';
+      if (lv >= 10) return 'Transuranics lab · period VII+';
+      if (lv >= 7) return 'Heavy metals · period VI';
+      if (lv >= 4) return 'Transition block · period IV–V';
+      return 'Period 1–3 · light elements';
+    }
+
+    let atomFactTimer = 0;
+    function showAtomFact(text) {
+      if (!atomFactEl || !text) return;
+      if (atomFactTimer) window.clearTimeout(atomFactTimer);
+      atomFactEl.classList.remove('fact-dim');
+      atomFactEl.textContent = text;
+      atomFactTimer = window.setTimeout(() => {
+        atomFactEl.classList.add('fact-dim');
+      }, 5200);
     }
 
     function updatePanicVisuals(stress) {
@@ -661,6 +1074,26 @@
     // --- Three (scene + renderer from js/render.js)
     const scene = new THREE.Scene();
     attachSceneBackground(scene);
+    {
+      const ch = 640;
+      const cw = 8;
+      const c = document.createElement('canvas');
+      c.width = cw;
+      c.height = ch;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, ch);
+      g.addColorStop(0, '#2a5048');
+      g.addColorStop(0.35, '#1a3830');
+      g.addColorStop(0.7, '#0f221c');
+      g.addColorStop(1, '#081410');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, cw, ch);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      scene.background = tex;
+    }
     scene.fog = null;
 
     const { renderer, camera, canvasEl } = createRendererAndCamera();
@@ -762,68 +1195,9 @@
     renderer.toneMappingExposure = 1.08;
 
     let fruitSharedTextures = null;
+    const elementFaceTextures = [];
 
     function buildFruitSharedTextures() {
-      const s = 256;
-      const cm = document.createElement('canvas');
-      cm.width = s;
-      cm.height = s;
-      const mx = cm.getContext('2d');
-      const base = mx.createRadialGradient(s * 0.5, s * 0.5, s * 0.08, s * 0.5, s * 0.5, s * 0.55);
-      base.addColorStop(0, '#f8f8fc');
-      base.addColorStop(0.45, '#e8e8f0');
-      base.addColorStop(1, '#d4d4e0');
-      mx.fillStyle = base;
-      mx.fillRect(0, 0, s, s);
-      mx.globalAlpha = 0.07;
-      for (let i = 0; i < 3200; i++) {
-        mx.fillStyle = `rgba(60,55,78,${0.08 + Math.random() * 0.12})`;
-        mx.beginPath();
-        mx.arc(Math.random() * s, Math.random() * s, 0.4 + Math.random() * 1.8, 0, Math.PI * 2);
-        mx.fill();
-      }
-      mx.globalAlpha = 1;
-      mx.lineCap = 'round';
-      mx.lineJoin = 'round';
-      for (let v = 0; v < 7; v++) {
-        mx.strokeStyle = `rgba(255,255,255,${0.045 + Math.random() * 0.05})`;
-        mx.lineWidth = 2.2 + Math.random() * 2.8;
-        mx.beginPath();
-        let x = Math.random() * s;
-        let y = Math.random() * s;
-        mx.moveTo(x, y);
-        for (let k = 0; k < 6; k++) {
-          const cx = x + (Math.random() - 0.3) * 50;
-          const cy = y + (Math.random() - 0.5) * 55;
-          const nx = cx + (Math.random() - 0.5) * 45;
-          const ny = cy + (Math.random() - 0.4) * 50;
-          mx.quadraticCurveTo(cx, cy, nx, ny);
-          x = nx;
-          y = ny;
-        }
-        mx.stroke();
-      }
-      for (let v = 0; v < 5; v++) {
-        mx.strokeStyle = `rgba(45,42,58,${0.04 + Math.random() * 0.06})`;
-        mx.lineWidth = 1.2 + Math.random() * 1.8;
-        mx.beginPath();
-        let x = Math.random() * s;
-        let y = Math.random() * s;
-        mx.moveTo(x, y);
-        for (let k = 0; k < 5; k++) {
-          const cx = x + (Math.random() - 0.5) * 42;
-          const cy = y + (Math.random() - 0.5) * 48;
-          const nx = cx + (Math.random() - 0.5) * 40;
-          const ny = cy + (Math.random() - 0.5) * 44;
-          mx.quadraticCurveTo(cx, cy, nx, ny);
-          x = nx;
-          y = ny;
-        }
-        mx.stroke();
-      }
-      const marbleMap = new THREE.CanvasTexture(cm);
-      marbleMap.colorSpace = THREE.SRGBColorSpace;
-
       const n2 = 128;
       const c2 = document.createElement('canvas');
       c2.width = n2;
@@ -840,8 +1214,48 @@
       roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
       roughnessMap.repeat.set(3, 3);
       roughnessMap.colorSpace = THREE.NoColorSpace;
+      return { roughnessMap };
+    }
 
-      return { marbleMap, roughnessMap };
+    function elementFaceMap(type) {
+      if (elementFaceTextures[type]) return elementFaceTextures[type];
+      const spec = FRUITS[type];
+      const s = 256;
+      const c = document.createElement('canvas');
+      c.width = s;
+      c.height = s;
+      const ctx = c.getContext('2d');
+      const tc = new THREE.Color(spec.color);
+      const hi = tc.clone().offsetHSL(0, 0, 0.12);
+      const lo = tc.clone().offsetHSL(0, 0.05, -0.22);
+      const g = ctx.createRadialGradient(s * 0.35, s * 0.32, s * 0.06, s * 0.5, s * 0.48, s * 0.58);
+      g.addColorStop(0, `#${hi.getHexString()}`);
+      g.addColorStop(0.55, `#${tc.getHexString()}`);
+      g.addColorStop(1, `#${lo.getHexString()}`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(s / 2, s / 2, s * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+      const sym = spec.symbol || '?';
+      const fs = sym.length > 2 ? 72 : 108;
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = `800 ${fs}px system-ui, "Segoe UI", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sym, s / 2, s / 2 - 6);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.52)';
+      ctx.font = '600 16px system-ui, sans-serif';
+      ctx.fillText(spec.name || '', s / 2, s * 0.78);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      elementFaceTextures[type] = tex;
+      return tex;
     }
 
     function initFruitVisuals() {
@@ -853,17 +1267,18 @@
       return 0.02 + tNorm * 0.025;
     }
 
-    /** Glassy game marbles: IBL + slight transmission on edges; ghost = preview */
+    /** Element sphere: symbol + name on map; ghost = queue preview */
     function makeFruitMaterial(type, { ghost = false } = {}) {
       initFruitVisuals();
       const spec = FRUITS[type];
       const tNorm = FRUITS.length > 1 ? type / (FRUITS.length - 1) : 0;
-      const { marbleMap, roughnessMap } = fruitSharedTextures;
+      const { roughnessMap } = fruitSharedTextures;
+      const faceMap = elementFaceMap(type);
 
       if (ghost) {
         return new THREE.MeshPhysicalMaterial({
-          color: spec.color,
-          map: marbleMap,
+          color: 0xffffff,
+          map: faceMap,
           roughnessMap,
           roughness: 0.18,
           metalness: 0,
@@ -883,8 +1298,8 @@
       }
 
       return new THREE.MeshPhysicalMaterial({
-        color: spec.color,
-        map: marbleMap,
+        color: 0xffffff,
+        map: faceMap,
         roughnessMap,
         roughness: 0.26,
         metalness: 0,
@@ -897,7 +1312,7 @@
         clearcoatRoughness: 0.12,
         attenuationColor: spec.color,
         attenuationDistance: 0.55 + tNorm * 0.45,
-        emissive: 0x181820,
+        emissive: 0x0a1210,
         emissiveIntensity: fruitIdleEmissiveIntensity(type),
         envMapIntensity: 1.05,
         depthWrite: true,
@@ -917,17 +1332,17 @@
       cb.height = bh;
       const bx = cb.getContext('2d');
       const vg = bx.createLinearGradient(0, 0, 0, bh);
-      vg.addColorStop(0, '#4a6088');
-      vg.addColorStop(0.22, '#3d4f72');
-      vg.addColorStop(0.5, '#2c3a58');
-      vg.addColorStop(0.78, '#242e48');
-      vg.addColorStop(1, '#1a2238');
+      vg.addColorStop(0, '#2d4a42');
+      vg.addColorStop(0.22, '#243838');
+      vg.addColorStop(0.5, '#1a2e28');
+      vg.addColorStop(0.78, '#14221c');
+      vg.addColorStop(1, '#0c1612');
       bx.fillStyle = vg;
       bx.fillRect(0, 0, bw, bh);
       const rg = bx.createRadialGradient(bw * 0.5, bh * 0.35, bh * 0.08, bw * 0.45, bh * 0.42, bh * 0.62);
-      rg.addColorStop(0, 'rgba(120, 160, 220, 0.22)');
-      rg.addColorStop(0.45, 'rgba(60, 90, 140, 0.08)');
-      rg.addColorStop(1, 'rgba(20, 28, 48, 0)');
+      rg.addColorStop(0, 'rgba(120, 220, 180, 0.18)');
+      rg.addColorStop(0.45, 'rgba(40, 120, 90, 0.1)');
+      rg.addColorStop(1, 'rgba(10, 28, 22, 0)');
       bx.fillStyle = rg;
       bx.fillRect(0, 0, bw, bh);
       bx.globalAlpha = 0.14;
@@ -945,9 +1360,9 @@
       cf.height = fs;
       const fx = cf.getContext('2d');
       const fg = fx.createRadialGradient(fs * 0.5, fs * 0.5, 0, fs * 0.5, fs * 0.5, fs * 0.72);
-      fg.addColorStop(0, '#5a6e90');
-      fg.addColorStop(0.55, '#3d4d68');
-      fg.addColorStop(1, '#2a3548');
+      fg.addColorStop(0, '#4a7068');
+      fg.addColorStop(0.55, '#2d4540');
+      fg.addColorStop(1, '#1a2e28');
       fx.fillStyle = fg;
       fx.fillRect(0, 0, fs, fs);
       fx.strokeStyle = 'rgba(255,255,255,0.04)';
@@ -1029,8 +1444,8 @@
         color: 0xffffff,
         roughness: 0.88,
         metalness: 0.04,
-        emissive: 0x1a2238,
-        emissiveIntensity: 0.14,
+        emissive: 0x0a1814,
+        emissiveIntensity: 0.18,
         envMapIntensity: 0.35,
       });
       const zoneBack = new THREE.Mesh(new THREE.PlaneGeometry(backW, backH), zoneBackMat);
@@ -1043,8 +1458,8 @@
         color: 0xffffff,
         roughness: 0.82,
         metalness: 0.08,
-        emissive: 0x151a28,
-        emissiveIntensity: 0.08,
+        emissive: 0x081210,
+        emissiveIntensity: 0.1,
         envMapIntensity: 0.4,
       });
       const floorGeo = new THREE.PlaneGeometry(innerX * 2 + 0.08, hz * 2 + 0.08);
@@ -1055,7 +1470,7 @@
       cupGroup.add(floorVis);
 
       const baseMat = new THREE.MeshStandardMaterial({
-        color: 0x252b3a,
+        color: 0x1a2824,
         roughness: 0.9,
         metalness: 0.18,
         envMapIntensity: 0.45,
@@ -1072,7 +1487,7 @@
 
       const makeWallGlass = () =>
         new THREE.MeshPhysicalMaterial({
-          color: 0xa8c0e8,
+          color: 0x7ec8b8,
           metalness: 0,
           roughness: 0.08,
           transmission: 0.62,
@@ -1106,7 +1521,7 @@
       cupGroup.add(frontWall);
 
       const lineMat = new THREE.MeshBasicMaterial({
-        color: 0xff5566,
+        color: 0xff9933,
         transparent: true,
         opacity: 0.38,
         depthWrite: false,
@@ -1464,7 +1879,8 @@
           beginJackpotVanish(a);
           beginJackpotVanish(b);
           addScore(jpPts, { skipScorePulse: true });
-          popFloatText(`★ +${jpPts}`, jx, jy, ROW_Z + 0.42, { jackpot: true, color: '#ffe8a8' });
+          popFloatText(`FUSION +${jpPts}`, jx, jy, ROW_Z + 0.42, { jackpot: true, color: '#fff4a8' });
+          showAtomFact('Fusion breakthrough — twin heaviest nuclei cleared the reactor column.');
           flashHudMerge(scoreEl);
           Sfx.playJackpot(jackHeat);
           vibrateJackpot(jackHeat);
@@ -1537,10 +1953,13 @@
           merged.body.angularVelocity.set(0, 0, 0);
           addScore(mergePts, { skipScorePulse: true });
           {
-            const fc = new THREE.Color(FRUITS[newType].color);
-            popFloatText(`+${mergePts}`, nx, ny + FRUITS[newType].radius * 0.42, ROW_Z + 0.48, {
+            const el = FRUITS[newType];
+            const fc = new THREE.Color(el.color);
+            popFloatText(`+${mergePts} ${el.symbol}`, nx, ny + el.radius * 0.42, ROW_Z + 0.48, {
               color: `#${fc.getHexString()}`,
             });
+            if (el.fact) showAtomFact(`${el.name} (${el.symbol}): ${el.fact}`);
+            noteElementDiscovered(el.atomicNumber);
           }
           flashHudMerge(scoreEl);
           Sfx.playMerge(newType, mult);
@@ -1565,6 +1984,7 @@
         gameOverDwell += dt;
         if (gameOverDwell >= GAME_OVER_DWELL_SEC) {
           gameOver = true;
+          gameOverDiscoveryMessage();
           overlay.classList.add('visible');
           overlay.setAttribute('aria-hidden', 'false');
           Sfx.playGameOver();
@@ -1590,11 +2010,18 @@
       lastDropTime = 0;
       overlay.classList.remove('visible');
       overlay.setAttribute('aria-hidden', 'true');
+      if (overlayDiscoverEl) overlayDiscoverEl.innerHTML = '';
+      runFirstEverZs = [];
       hitPause = 0;
       heartbeatAcc = 0;
       cancelVibration();
       updatePanicVisuals(0);
       if (floatFxEl) floatFxEl.replaceChildren();
+      if (atomFactEl) {
+        if (atomFactTimer) window.clearTimeout(atomFactTimer);
+        atomFactEl.textContent = '';
+        atomFactEl.classList.remove('fact-dim');
+      }
       syncHud();
       aimPromoteActive = false;
       aimPromoteElapsed = 0;
@@ -1627,6 +2054,7 @@
       const last = fruits[fruits.length - 1];
       last.body.velocity.set(0, -effectiveDropVy(), 0);
       addScore(2);
+      noteElementDiscovered(spec.atomicNumber);
       Sfx.playDrop();
       dropQueue.shift();
       dropQueue.push(rollQueuedDropType());
@@ -1696,6 +2124,11 @@
     }
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && discoveryOpen) {
+        closeDiscovery();
+        e.preventDefault();
+        return;
+      }
       if (e.key === 'r' || e.key === 'R') fullReset();
       if (e.key === 'f' || e.key === 'F') toggleBrowserFullscreen();
       if (e.key === 'd' || e.key === 'D') {
@@ -1730,6 +2163,14 @@
 
       if (hitPause > 0) {
         hitPause -= dt;
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (discoveryOpen && !gameOver) {
+        juice.updateParticles(dt);
+        updateCameraFrustum();
+        camera.position.set(0, orthoMidY, 20);
         renderer.render(scene, camera);
         return;
       }

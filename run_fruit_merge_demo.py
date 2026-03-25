@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Serve fruit-merge-3d-demo.html over HTTP (avoids file:// CORS / import map issues).
+Serve the project over HTTP (avoids file:// CORS / import map issues).
+"/" redirects to index.html (mode picker: marbles vs periodic stack).
 
 Local:
   python run_fruit_merge_demo.py
@@ -32,7 +33,7 @@ def _default_host_port() -> tuple[str, int]:
 def main() -> int:
     default_host, default_port = _default_host_port()
 
-    parser = argparse.ArgumentParser(description="HTTP server for the 3D fruit merge demo.")
+    parser = argparse.ArgumentParser(description="HTTP server for stack games (menu at index.html).")
     parser.add_argument(
         "--host",
         default=default_host,
@@ -62,9 +63,9 @@ def main() -> int:
         print(f"Not a directory: {root}", file=sys.stderr)
         return 1
 
-    demo = root / "fruit-merge-3d-demo.html"
-    if not demo.is_file():
-        print(f"Missing {demo.name} under {root}", file=sys.stderr)
+    index = root / "index.html"
+    if not index.is_file():
+        print(f"Missing {index.name} under {root}", file=sys.stderr)
         return 1
 
     os.chdir(root)
@@ -74,7 +75,7 @@ def main() -> int:
             root = self.path.split("?", 1)[0]
             if root == "/":
                 self.send_response(302)
-                self.send_header("Location", "/fruit-merge-3d-demo.html")
+                self.send_header("Location", "/index.html")
                 self.end_headers()
                 return
             super().do_GET()
@@ -102,7 +103,7 @@ def main() -> int:
     print("Press Ctrl+C to stop.")
 
     if not args.no_browser and args.host not in ("0.0.0.0", "::"):
-        url = f"http://127.0.0.1:{args.port}/fruit-merge-3d-demo.html"
+        url = f"http://127.0.0.1:{args.port}/"
         with contextlib.suppress(OSError):
             webbrowser.open(url)
 

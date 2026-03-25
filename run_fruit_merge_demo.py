@@ -2,9 +2,13 @@
 """
 Serve fruit-merge-3d-demo.html over HTTP (avoids file:// CORS / import map issues).
 
-Usage:
+Local:
   python run_fruit_merge_demo.py
   python run_fruit_merge_demo.py --port 8765 --no-browser
+
+Render / cloud:
+  Set PORT (Render does this automatically). The server binds 0.0.0.0 and uses PORT.
+  Start command: python run_fruit_merge_demo.py
 """
 
 from __future__ import annotations
@@ -18,18 +22,27 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
+def _default_host_port() -> tuple[str, int]:
+    """Render and similar platforms inject PORT; must listen on all interfaces."""
+    if os.environ.get("PORT"):
+        return "0.0.0.0", int(os.environ["PORT"])
+    return "127.0.0.1", 8765
+
+
 def main() -> int:
+    default_host, default_port = _default_host_port()
+
     parser = argparse.ArgumentParser(description="HTTP server for the 3D fruit merge demo.")
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
-        help="Bind address (default: 127.0.0.1)",
+        default=default_host,
+        help=f"Bind address (default: {default_host}; 0.0.0.0 when PORT env is set)",
     )
     parser.add_argument(
         "--port",
         type=int,
-        default=8765,
-        help="Port (default: 8765)",
+        default=default_port,
+        help=f"Port (default: {default_port}; from PORT env on Render)",
     )
     parser.add_argument(
         "--directory",
@@ -57,6 +70,15 @@ def main() -> int:
     os.chdir(root)
 
     class Handler(SimpleHTTPRequestHandler):
+        def do_GET(self) -> None:
+            root = self.path.split("?", 1)[0]
+            if root == "/":
+                self.send_response(302)
+                self.send_header("Location", "/fruit-merge-3d-demo.html")
+                self.end_headers()
+                return
+            super().do_GET()
+
         def end_headers(self) -> None:
             # Avoid stale demo when iterating locally (browser aggressive caching)
             if self.path.endswith(".html"):
@@ -71,12 +93,16 @@ def main() -> int:
     # (we actually open before serve_forever, but threading is still nicer for multiple tabs)
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
 
-    url = f"http://{args.host}:{args.port}/fruit-merge-3d-demo.html?v=12"
     print(f"Serving {root}")
-    print(f"Open: {url}")
+    print(f"Listening on http://{args.host}:{args.port}/")
+    if args.host == "0.0.0.0":
+        print("Deploy: open your Render service URL ( / redirects to the demo HTML ).")
+    else:
+        print(f"Demo: http://{args.host}:{args.port}/fruit-merge-3d-demo.html")
     print("Press Ctrl+C to stop.")
 
-    if not args.no_browser:
+    if not args.no_browser and args.host not in ("0.0.0.0", "::"):
+        url = f"http://127.0.0.1:{args.port}/fruit-merge-3d-demo.html"
         with contextlib.suppress(OSError):
             webbrowser.open(url)
 

@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>fruit-merge v27</title>
+  <title>fruit-merge v28</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -66,7 +66,7 @@
 </head>
 <body>
   <div id="hud">
-    <span style="font-size:11px;color:#7ab8ff">demo <strong id="buildId">v27</strong></span><br />
+    <span style="font-size:11px;color:#7ab8ff">demo <strong id="buildId">v28</strong></span><br />
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
@@ -78,7 +78,7 @@
     <div style="font-size:45%;opacity:.75;margin-top:8px">Press <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> to restart</div>
   </div>
   <div id="help">
-    Move / click: aim & drop<br />
+    Touch: slide, <strong>release to drop</strong> · Mouse: drag, release<br />
     Merge same tier up · two largest touch = clear + big pts · drops 0–3 · <kbd>R</kbd> · <kbd>F</kbd> · <kbd>D</kbd>
   </div>
 
@@ -154,22 +154,22 @@
     const FRUIT_MASS_BASE = 8.5;
     const MASS_PER_VOL = 58;
 
-    /** Classic merge: two of the same tier → one of the next (~1.31× radius per step). */
+    /** Classic merge: two of the same tier → one of the next (~1.31× radius per step). Scaled ~10% for readability. */
     const FRUITS = [
-      { radius: 0.44, color: 0xe53935 },
-      { radius: 0.58, color: 0xfdd835 },
-      { radius: 0.76, color: 0x00bcd4 },
-      { radius: 0.99, color: 0xff9100 },
-      { radius: 1.3, color: 0x8e24aa },
-      { radius: 1.71, color: 0x43a047 },
-      { radius: 2.24, color: 0xb8956b },
+      { radius: 0.485, color: 0xe53935 },
+      { radius: 0.638, color: 0xfdd835 },
+      { radius: 0.836, color: 0x00bcd4 },
+      { radius: 1.089, color: 0xff9100 },
+      { radius: 1.43, color: 0x8e24aa },
+      { radius: 1.881, color: 0x43a047 },
+      { radius: 2.464, color: 0xb8956b },
     ];
     const MERGEABLE_TYPE_MAX = FRUITS.length - 2;
     const MAX_RADIUS = FRUITS[FRUITS.length - 1].radius;
     const MERGE_POINTS = FRUITS.map((_, i) => (i + 1) * 15);
 
     const CUP_BASE = {
-      halfX: 3.45,
+      halfX: 3.75,
       get halfZ() {
         return Math.max(0.52, MAX_RADIUS + 0.08);
       },
@@ -339,8 +339,8 @@
       sleepSpeedLimit: 0.1,
       sleepTimeLimit: 0.24,
       wallVelRetain: 0.018,
-      mergeVelScale: 0.035,
-      mergeAngScale: 0.05,
+      mergeVelScale: 0.012,
+      mergeAngScale: 0.02,
       dropVy: 0.22,
       contactStiffness6: 88,
       contactRelaxation: 6,
@@ -718,16 +718,16 @@
           const rNew = FRUITS[newType].radius;
           const lim = innerHalfXForRadius(rNew);
           const cx = Math.max(-lim, Math.min(lim, nx));
-          const nyLifted = Math.max(rNew + 0.045, ny);
+          const nyLifted = Math.max(rNew + 0.02, ny);
 
           removeFruit(a);
           removeFruit(b);
           spawnFruit(newType, cx, nyLifted, ROW_Z);
           const merged = fruits[fruits.length - 1];
-          merged.body.velocity.scale(physicsTuning.mergeVelScale, merged.body.velocity);
-          merged.body.angularVelocity.scale(physicsTuning.mergeAngScale, merged.body.angularVelocity);
+          merged.body.velocity.set(0, -0.06, 0);
+          merged.body.angularVelocity.set(0, 0, 0);
           addScore(MERGE_POINTS[a.type] ?? 20);
-          mergeCooldown = 10;
+          mergeCooldown = 14;
           return;
         }
       }
@@ -806,10 +806,38 @@
       { passive: true },
     );
 
-    renderer.domElement.addEventListener('pointerdown', (e) => {
+    /** Touch: aim while finger down, drop on release. Mouse: same (press-drag-release). */
+    let aimPointerId = null;
+
+    canvasEl.addEventListener('pointerdown', (e) => {
+      if (gameOver) return;
       if (e.button !== 0) return;
+      aimPointerId = e.pointerId;
+      try {
+        canvasEl.setPointerCapture(e.pointerId);
+      } catch (_) {}
       updateGhostAt(e.clientX, e.clientY);
-      dropNext();
+    });
+
+    function finishAimPointer(e, doDrop) {
+      if (aimPointerId === null || e.pointerId !== aimPointerId) return;
+      if (e.button !== 0 && e.type !== 'pointercancel') return;
+      aimPointerId = null;
+      try {
+        canvasEl.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      if (doDrop && !gameOver) {
+        updateGhostAt(e.clientX, e.clientY);
+        dropNext();
+      }
+    }
+
+    canvasEl.addEventListener('pointerup', (e) => {
+      finishAimPointer(e, true);
+    });
+
+    canvasEl.addEventListener('pointercancel', (e) => {
+      finishAimPointer(e, false);
     });
 
     function toggleBrowserFullscreen() {

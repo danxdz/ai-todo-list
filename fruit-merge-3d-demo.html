@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>fruit-merge v26</title>
+  <title>fruit-merge v27</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -66,7 +66,7 @@
 </head>
 <body>
   <div id="hud">
-    <span style="font-size:11px;color:#7ab8ff">demo <strong id="buildId">v26</strong></span><br />
+    <span style="font-size:11px;color:#7ab8ff">demo <strong id="buildId">v27</strong></span><br />
     <strong>Score</strong> <span id="scoreVal">0</span><br />
     <strong>Level</strong> <span id="levelVal">1</span>
     <span style="opacity:.75"> · next at <span id="nextLvlVal">200</span> pts</span><br />
@@ -687,8 +687,11 @@
           const b = fruits[j];
           if (a.type !== MAX_TYPE || b.type !== MAX_TYPE) continue;
           const rMax = FRUITS[MAX_TYPE].radius;
-          const dist = a.body.position.distanceTo(b.body.position);
-          if (dist > (rMax + rMax) * 1.12) continue;
+          const touch = rMax + rMax;
+          const dx = a.body.position.x - b.body.position.x;
+          const dy = a.body.position.y - b.body.position.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > touch * 1.38) continue;
           removeFruit(a);
           removeFruit(b);
           addScore(JACKPOT_MERGE_PTS);

@@ -5,6 +5,29 @@
 import { scoreWithMultiplier } from './gameplay.js';
 
 /**
+ * Calm chain reactions: slow nearby bodies right after a merge so the pile
+ * does not launch balls past the danger line.
+ * @param {object} ctx
+ * @param {number} cx
+ * @param {number} cy
+ * @param {object} mergedEntry
+ * @param {number} radius
+ * @param {number} factor 0–1
+ */
+function dampMergeNeighbors(ctx, cx, cy, mergedEntry, radius, factor) {
+  const r2 = radius * radius;
+  for (const f of ctx.getFruits()) {
+    if (f === mergedEntry) continue;
+    const dx = f.body.position.x - cx;
+    const dy = f.body.position.y - cy;
+    if (dx * dx + dy * dy > r2) continue;
+    f.body.velocity.x *= factor;
+    f.body.velocity.y *= factor;
+    f.body.velocity.z = 0;
+  }
+}
+
+/**
  * @param {object} ctx
  * @param {() => boolean} ctx.getGameOver
  * @param {() => number} ctx.getMergeCooldown
@@ -44,7 +67,8 @@ import { scoreWithMultiplier } from './gameplay.js';
  * @param {(jpPts: number) => string} [flavor.jackpotFloatTwinTen]
  * @param {() => void} [flavor.onJackpotTwinTenExtra]
  * @param {(mergePts: number, newType: number, nx: number, ny: number, spec: object) => void} flavor.onNormalMergeUi
- * @param {boolean} [flavor.vfxHeavy] — extra smoke / shatter (atoms theme)
+ * @param {boolean} [flavor.vfxHeavy] — extra particles when vfxLevel is not minimal
+ * @param {'minimal' | 'normal' | 'heavy'} [flavor.vfxLevel] — minimal = soft burst only (default)
  */
 export function createTryMerge(ctx, flavor) {
   const {
@@ -57,7 +81,14 @@ export function createTryMerge(ctx, flavor) {
     onJackpotTwinTenExtra,
     onNormalMergeUi,
     vfxHeavy = false,
+    vfxLevel = 'minimal',
   } = flavor;
+
+  function resolveVfxLevel() {
+    const v = flavor.vfxLevel;
+    if (typeof v === 'function') return v() ?? 'minimal';
+    return v ?? 'minimal';
+  }
 
   return function tryMerge() {
     if (ctx.getMergeCooldown() > 0 || ctx.getGameOver()) return;
@@ -87,11 +118,22 @@ export function createTryMerge(ctx, flavor) {
         const jBurst = Math.min(120, 52 + chainJp * 22 + Math.floor((jm - 1) * 18));
         const jBoost = 1 + chainJp * 0.11 + (jm - 1) * 0.14;
         const jpPts = scoreWithMultiplier(JACKPOT_MERGE_PTS, jm);
-        ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, jBurst, jBoost, 'jackpot');
-        ctx.juice.burstSparks(jx, jy, ctx.ROW_Z + 0.05, ctx.FRUITS[MAX_TYPE].color, 28);
-        ctx.juice.smokePuff?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, vfxHeavy ? 38 : 26);
-        ctx.juice.shatterSpray?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, vfxHeavy ? 28 : 18);
-        ctx.queueHitPause(0.088);
+        const vl = resolveVfxLevel();
+        const vfxMin = vl === 'minimal';
+        const vfxNorm = vl === 'normal';
+        if (vfxMin) {
+          ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, 22, 0.85, 'jackpot');
+        } else {
+          const jb = vfxNorm ? Math.min(72, jBurst) : jBurst;
+          const jbb = vfxNorm ? Math.min(1.35, jBoost) : jBoost;
+          ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, jb, jbb, 'jackpot');
+          ctx.juice.burstSparks(jx, jy, ctx.ROW_Z + 0.05, ctx.FRUITS[MAX_TYPE].color, vfxNorm ? 14 : 28);
+          if (!vfxNorm || vfxHeavy) {
+            ctx.juice.smokePuff?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, vfxHeavy ? 38 : 18);
+            ctx.juice.shatterSpray?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, vfxHeavy ? 22 : 12);
+          }
+        }
+        ctx.queueHitPause(vfxMin ? 0.045 : 0.088);
         ctx.beginJackpotVanish(a);
         ctx.beginJackpotVanish(b);
         ctx.addScore(jpPts, { skipScorePulse: true });
@@ -134,11 +176,22 @@ export function createTryMerge(ctx, flavor) {
           const jBurst = Math.min(100, 44 + chainJp * 18 + Math.floor((jm - 1) * 14));
           const jBoost = 1 + chainJp * 0.09 + (jm - 1) * 0.12;
           const jpPts = scoreWithMultiplier(TEN_JP_PTS, jm);
-          ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, jBurst, jBoost, 'jackpot');
-          ctx.juice.burstSparks(jx, jy, ctx.ROW_Z + 0.05, ctx.FRUITS[twinTenType].color, 24);
-          ctx.juice.smokePuff?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, vfxHeavy ? 34 : 24);
-          ctx.juice.shatterSpray?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, vfxHeavy ? 24 : 16);
-          ctx.queueHitPause(0.08);
+          const vl = resolveVfxLevel();
+          const vfxMin = vl === 'minimal';
+          const vfxNorm = vl === 'normal';
+          if (vfxMin) {
+            ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, 20, 0.82, 'jackpot');
+          } else {
+            const jb = vfxNorm ? Math.min(64, jBurst) : jBurst;
+            const jbb = vfxNorm ? Math.min(1.28, jBoost) : jBoost;
+            ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, jb, jbb, 'jackpot');
+            ctx.juice.burstSparks(jx, jy, ctx.ROW_Z + 0.05, ctx.FRUITS[twinTenType].color, vfxNorm ? 12 : 24);
+            if (!vfxNorm || vfxHeavy) {
+              ctx.juice.smokePuff?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, vfxHeavy ? 30 : 18);
+              ctx.juice.shatterSpray?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, vfxHeavy ? 18 : 10);
+            }
+          }
+          ctx.queueHitPause(vfxMin ? 0.04 : 0.08);
           ctx.beginJackpotVanish(a);
           ctx.beginJackpotVanish(b);
           ctx.addScore(jpPts, { skipScorePulse: true });
@@ -198,37 +251,48 @@ export function createTryMerge(ctx, flavor) {
         const s = ctx.physicsTuning.mergeVelScale;
         let mvx = (ma * va.x + mb * vb.x) * invSum * s;
         let mvy = (ma * va.y + mb * vb.y) * invSum * s;
-        mvx *= 0.72;
-        mvy *= mvy > 0 ? 0.22 : 0.62;
+        mvx *= 0.52;
+        mvy *= mvy > 0 ? 0.16 : 0.48;
 
         const nowM = performance.now();
         const chainSnap =
           nowM - ctx.lastMergeAtMs() <= ctx.COMBO_CHAIN_SEC * 1000 ? ctx.comboChain() : 0;
         const mult = ctx.mergeComboMultBeforeBump();
         ctx.bumpMergeCombo();
-        const mergeIntensity = 1 + mult * 0.2 + chainSnap * 0.09;
-        const pCount = Math.min(96, 38 + chainSnap * 15 + Math.floor((mult - 1) * 12));
-        const pBoost = 1 + chainSnap * 0.1 + (mult - 1) * 0.16;
+        const mergeIntensity = 1 + mult * 0.18 + chainSnap * 0.07;
         const mergePts = scoreWithMultiplier(ctx.MERGE_POINTS[a.type] ?? 20, mult);
-        ctx.juice.burst(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, pCount, pBoost, 'merge');
-        ctx.juice.burstSparks(
-          nx,
-          ny,
-          ctx.ROW_Z + 0.06,
-          ctx.FRUITS[a.type].color,
-          Math.min(26, 12 + Math.floor(pCount * 0.22)),
-        );
-        const smCount = Math.min(32, 14 + Math.floor(chainSnap * 6) + Math.floor((mult - 1) * 4));
-        const shCount = Math.min(22, 10 + Math.floor(chainSnap * 4) + Math.floor((mult - 1) * 3));
-        ctx.juice.smokePuff?.(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, vfxHeavy ? smCount + 10 : smCount);
-        ctx.juice.shatterSpray?.(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, vfxHeavy ? shCount + 6 : shCount);
-        ctx.queueHitPause(0.052);
+        const vl = resolveVfxLevel();
+        const vfxMin = vl === 'minimal';
+        const vfxNorm = vl === 'normal';
+        if (vfxMin) {
+          ctx.juice.burst(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, 16, 0.72, 'merge');
+        } else {
+          const pCount = Math.min(96, 38 + chainSnap * 15 + Math.floor((mult - 1) * 12));
+          const pBoost = 1 + chainSnap * 0.1 + (mult - 1) * 0.16;
+          const pc = vfxNorm ? Math.min(52, pCount) : pCount;
+          const pb = vfxNorm ? Math.min(1.25, pBoost) : pBoost;
+          ctx.juice.burst(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, pc, pb, 'merge');
+          ctx.juice.burstSparks(
+            nx,
+            ny,
+            ctx.ROW_Z + 0.06,
+            ctx.FRUITS[a.type].color,
+            Math.min(20, 8 + Math.floor(pc * 0.2)),
+          );
+          const smCount = Math.min(32, 14 + Math.floor(chainSnap * 6) + Math.floor((mult - 1) * 4));
+          const shCount = Math.min(22, 10 + Math.floor(chainSnap * 4) + Math.floor((mult - 1) * 3));
+          if (!vfxNorm || vfxHeavy) {
+            ctx.juice.smokePuff?.(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, vfxHeavy ? smCount + 10 : smCount);
+            ctx.juice.shatterSpray?.(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, vfxHeavy ? shCount + 6 : shCount);
+          }
+        }
+        ctx.queueHitPause(vfxMin ? 0.028 : 0.052);
 
         ctx.removeFruit(a);
         ctx.removeFruit(b);
         ctx.spawnFruit(newType, cx, nySpawn, ctx.ROW_Z, { fusionPop: true });
         const merged = ctx.getFruits()[ctx.getFruits().length - 1];
-        const cap = 12;
+        const cap = 4.2;
         const sp = Math.hypot(mvx, mvy);
         if (sp > cap) {
           const k = cap / sp;
@@ -237,6 +301,7 @@ export function createTryMerge(ctx, flavor) {
         }
         merged.body.velocity.set(mvx, mvy, 0);
         merged.body.angularVelocity.set(0, 0, 0);
+        dampMergeNeighbors(ctx, nx, ny, merged, Math.max(ra, rb) * 2.85, 0.52);
         ctx.addScore(mergePts, { skipScorePulse: true });
         onNormalMergeUi(mergePts, newType, nx, ny, ctx.FRUITS[newType]);
         ctx.flashHudMerge(ctx.scoreEl);

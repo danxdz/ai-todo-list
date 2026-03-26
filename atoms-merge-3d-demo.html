@@ -719,7 +719,7 @@
     } from './js/atoms-discovery.js';
     import { createSfx } from './js/sfx.js';
     import { createJuice } from './js/effects.js';
-    import { physicsTuning, createPhysicsWorld, applyPhysicsPreset } from './js/physics.js';
+    import { physicsTuning, createPhysicsWorld, applyPhysicsPreset, nudgeSpawnSpin } from './js/physics.js';
     import {
       attachSceneBackground,
       createRendererAndCamera,
@@ -1529,6 +1529,7 @@
       body.sleepSpeedLimit = physicsTuning.sleepSpeedLimit;
       body.sleepTimeLimit = physicsTuning.sleepTimeLimit;
       world.addBody(body);
+      nudgeSpawnSpin(body);
 
       group.position.copy(body.position);
 

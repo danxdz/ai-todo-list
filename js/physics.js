@@ -8,7 +8,8 @@ const CERAMIC_VALUES = {
   frictionFruit: 0.76,
   frictionDefault: 0.72,
   linearDamping: 0.12,
-  angularDamping: 0.42,
+  /** Lower = visible roll on pile (sprites still billboard in atoms) */
+  angularDamping: 0.26,
   sleepSpeedLimit: 0.18,
   sleepTimeLimit: 0.22,
   wallVelRetain: 0.003,
@@ -16,9 +17,10 @@ const CERAMIC_VALUES = {
   mergeVelScale: 0.035,
   mergeAngScale: 0.02,
   dropVy: 0.2,
-  contactStiffness6: 192,
-  contactRelaxation: 3.8,
-  solverIterations: 48,
+  /** Stiffer contacts = less visual overlap / sinking into neighbors */
+  contactStiffness6: 228,
+  contactRelaxation: 3.15,
+  solverIterations: 52,
   frictionEqStiffness7: 6.8,
   frictionEqRelaxation: 1.95,
 };
@@ -36,15 +38,15 @@ export const PHYSICS_PRESETS = {
     frictionFruit: 0.8,
     frictionDefault: 0.8,
     linearDamping: 0.13,
-    angularDamping: 0.44,
+    angularDamping: 0.28,
     sleepSpeedLimit: 0.14,
     sleepTimeLimit: 0.28,
     wallVelRetain: 0.002,
     mergeVelScale: 0.028,
     dropVy: 0.28,
-    contactStiffness6: 218,
-    contactRelaxation: 3.2,
-    solverIterations: 54,
+    contactStiffness6: 238,
+    contactRelaxation: 2.95,
+    solverIterations: 56,
     frictionEqStiffness7: 7.4,
     frictionEqRelaxation: 1.72,
   },
@@ -57,7 +59,7 @@ export const PHYSICS_PRESETS = {
     frictionFruit: 0.82,
     frictionDefault: 0.9,
     linearDamping: 0.55,
-    angularDamping: 0.68,
+    angularDamping: 0.5,
     sleepSpeedLimit: 0.42,
     sleepTimeLimit: 0.26,
     wallVelRetain: 0.002,
@@ -121,4 +123,18 @@ export function createPhysicsWorld() {
   }
 
   return { world, physicsMaterial, fruitContact, applyPhysicsTuning };
+}
+
+/**
+ * Small random spin so pile balls visibly roll (ortho + shared damping otherwise hides rotation).
+ * @param {import('cannon-es').Body} body
+ */
+export function nudgeSpawnSpin(body) {
+  if (!body?.angularVelocity) return;
+  const s = 5.5;
+  body.angularVelocity.set(
+    (Math.random() - 0.5) * s,
+    (Math.random() - 0.5) * s * 0.6,
+    (Math.random() - 0.5) * s * 0.45,
+  );
 }

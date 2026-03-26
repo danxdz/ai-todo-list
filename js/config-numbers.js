@@ -1,6 +1,5 @@
 /**
- * Number Stack — simple addition merge for kids 3–8.
- * Rule: merge identical numbers → their sum (must match a tier in FRUITS).
+ * Number Stack — two identical numbers merge into the next tier (1+1→2, 2+2→3, …).
  */
 
 export const ROW_Z = 0;
@@ -19,6 +18,7 @@ export function fruitMassForRadius(r) {
 export const MERGE_DIST_MULT = 1.045;
 export const JACKPOT_MERGE_DIST_MULT = 1.12;
 
+/** Tier index i displays number i + 1 (twelve tiers: 1 … 12). */
 export const FRUITS = [
   { radius: 0.52, color: 0xff6b6b, number: 1, fact: 'One!' },
   { radius: 0.7, color: 0xffa56b, number: 2, fact: 'Two!' },
@@ -29,11 +29,13 @@ export const FRUITS = [
   { radius: 2.2, color: 0xb66bff, number: 7, fact: 'Seven!' },
   { radius: 2.6, color: 0xff6be6, number: 8, fact: 'Eight!' },
   { radius: 3.0, color: 0xff9ff3, number: 9, fact: 'Nine!' },
-  { radius: 3.45, color: 0x54a0ff, number: 10, fact: 'Ten! Amazing!' },
-  { radius: 3.9, color: 0xff6b9f, number: 12, fact: 'Twelve!' },
+  { radius: 3.35, color: 0x54a0ff, number: 10, fact: 'Ten!' },
+  { radius: 3.65, color: 0xff6b9f, number: 11, fact: 'Eleven!' },
+  { radius: 3.9, color: 0xffd93d, number: 12, fact: 'Twelve!' },
 ];
 
 export const MERGE_POINTS = FRUITS.map((_, i) => (i + 1) * 20);
+/** Two of the same tier ≤ this index merge into tier+1; top tier pair triggers jackpot. */
 export const MERGEABLE_TYPE_MAX = FRUITS.length - 2;
 export const MAX_RADIUS = FRUITS[FRUITS.length - 1].radius;
 

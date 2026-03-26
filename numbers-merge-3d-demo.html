@@ -346,7 +346,7 @@
   <div id="floatFx" aria-hidden="true"></div>
   <div id="hud">
     <div class="hud-column">
-      <div class="hud-brand">number stack <strong id="buildId">let's add!</strong></div>
+      <div class="hud-brand">number stack <strong id="buildId">v2 · face-you digits</strong></div>
       <div class="hud-stat">
         <span class="hud-label">Score</span>
         <span class="hud-value" id="scoreVal">0</span>
@@ -379,7 +379,7 @@
     <button type="button" id="overlayRestart">Restart</button>
   </div>
   <div id="help">
-    Same number + same number = <strong>add them up!</strong> · Twin biggest = sparkle jackpot<br />
+    Same number + same number = <strong>next bigger number!</strong> (1+1→2, 2+2→3, …) · Twin 12s = sparkle jackpot<br />
     <kbd>R</kbd> restart · <kbd>F</kbd> full · <kbd>D</kbd> debug ·
     <a class="help-link" href="fruit-merge-3d-demo.html" style="color:#ffc8a8">Marbles</a> ·
     <a class="help-link" href="atoms-merge-3d-demo.html" style="color:#a8e8ff">Atoms</a> ·
@@ -501,6 +501,11 @@
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
     import { createPlayfieldCup } from './js/playfield-cup.js';
     import { createTryMerge } from './js/merge-engine.js';
+    import {
+      createNumberDigitSprite,
+      updateLabelBillboard,
+      setNumberLabelScale,
+    } from './js/ball-label-sprite.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
     /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
@@ -557,15 +562,6 @@
         numberTipEl.classList.add('tip-dim');
       }, 4800);
     }
-
-    function typeIndexForNumber(n) {
-      for (let i = 0; i < FRUITS.length; i++) {
-        if (FRUITS[i].number === n) return i;
-      }
-      return -1;
-    }
-
-    const TWIN_TEN_TYPE = FRUITS.findIndex((f) => f.number === 10);
 
     function updatePanicVisuals(stress) {
       if (!panicEl) return;
@@ -736,6 +732,7 @@
       return { roughnessMap };
     }
 
+    /** Sphere skin only — digit is a billboard sprite (always faces player). */
     function numberFaceMap(type) {
       if (elementFaceTextures[type]) return elementFaceTextures[type];
       const spec = FRUITS[type];
@@ -751,19 +748,6 @@
       g.addColorStop(1, '#222222');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, s, s);
-      const numStr = String(spec.number);
-      ctx.shadowColor = 'rgba(0,0,0,0.7)';
-      ctx.shadowBlur = 18;
-      ctx.fillStyle = '#ffffff';
-      const numSize = numStr.length >= 2 ? 88 : 108;
-      ctx.font = `900 ${numSize}px system-ui, "Segoe UI", sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(numStr, s / 2, s / 2 + 8);
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = '600 18px system-ui, sans-serif';
-      ctx.fillText(spec.fact, s / 2, s * 0.78);
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
       elementFaceTextures[type] = tex;
@@ -779,7 +763,23 @@
       return 0.02 + tNorm * 0.025;
     }
 
-    /** Number spheres: big digit + cheer line; ghost = queue preview */
+    function buildBallGroup(type, r, { ghost = false } = {}) {
+      const spec = FRUITS[type];
+      const geo = new THREE.SphereGeometry(r, 32, 24);
+      const mat = makeFruitMaterial(type, { ghost });
+      const ball = new THREE.Mesh(geo, mat);
+      ball.castShadow = !ghost;
+      ball.receiveShadow = true;
+      const label = createNumberDigitSprite(spec);
+      setNumberLabelScale(label, r);
+      label.position.z = r * 0.92;
+      const group = new THREE.Group();
+      group.add(ball);
+      group.add(label);
+      return { group, ball, label };
+    }
+
+    /** Number spheres: gradient skin; digit on billboard sprite */
     function makeFruitMaterial(type, { ghost = false } = {}) {
       initFruitVisuals();
       const spec = FRUITS[type];
@@ -870,7 +870,7 @@
       themeId: 'numbers',
     });
 
-    /** @type {{ mesh: THREE.Mesh, body: CANNON.Body, type: number, fusionT?: number, fusionDur?: number }[]} */
+    /** @type {{ mesh: THREE.Group, ball: THREE.Mesh, label: THREE.Sprite, body: CANNON.Body, type: number, fusionT?: number, fusionDur?: number }[]} */
     let fruits = [];
 
     function applyPhysicsTuning() {
@@ -881,28 +881,38 @@
     let jackpotVanishes = [];
     let mergeCooldown = 0;
 
+    function disposeNumberVisualRoot(root) {
+      root.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          for (const m of mats) {
+            if (m.map) m.map.dispose();
+            m.dispose?.();
+          }
+        }
+      });
+    }
+
     function disposeJackpotVanishAll() {
       for (const v of jackpotVanishes) {
         scene.remove(v.mesh);
-        v.mesh.geometry.dispose();
-        if (v.mesh.material && typeof v.mesh.material.dispose === 'function') {
-          v.mesh.material.dispose();
-        }
+        disposeNumberVisualRoot(v.mesh);
       }
       jackpotVanishes.length = 0;
     }
 
     function beginJackpotVanish(entry) {
-      const mesh = entry.mesh;
-      mesh.position.copy(entry.body.position);
-      mesh.quaternion.copy(entry.body.quaternion);
-      mesh.scale.setScalar(1);
+      const root = entry.mesh;
+      root.position.copy(entry.body.position);
+      root.scale.setScalar(1);
       world.removeBody(entry.body);
       fruits = fruits.filter((f) => f !== entry);
-      const mat = mesh.material;
+      const mat = entry.ball.material;
       const baseEmissive = mat && typeof mat.emissiveIntensity === 'number' ? mat.emissiveIntensity : 0.08;
       jackpotVanishes.push({
-        mesh,
+        mesh: root,
+        ball: entry.ball,
         t: 0,
         dur: 0.2,
         baseEmissive,
@@ -916,14 +926,13 @@
         const u = Math.min(1, v.t / v.dur);
         const s = Math.max(0.0001, 1 - u);
         v.mesh.scale.setScalar(s);
-        const mat = v.mesh.material;
+        const mat = v.ball.material;
         if (mat && typeof mat.emissiveIntensity === 'number') {
           mat.emissiveIntensity = v.baseEmissive + 0.65 * u;
         }
         if (u >= 1) {
           scene.remove(v.mesh);
-          v.mesh.geometry.dispose();
-          if (mat && typeof mat.dispose === 'function') mat.dispose();
+          disposeNumberVisualRoot(v.mesh);
           jackpotVanishes.splice(i, 1);
         }
       }
@@ -958,21 +967,17 @@
         if (existing && existing.type === t) continue;
         if (existing) {
           queuePreviewGroup.remove(existing.mesh);
-          existing.mesh.geometry.dispose();
-          existing.mesh.material.dispose();
+          disposeNumberVisualRoot(existing.mesh);
         }
         const isAim = i === 0;
         const rGeom = isAim ? FRUITS[t].radius : FRUITS[t].radius * QUEUE_STRIP_SCALE;
-        const geo = new THREE.SphereGeometry(rGeom, isAim ? 28 : 18, isAim ? 20 : 14);
-        const mat = makeFruitMaterial(t, { ghost: false });
-        mat.depthTest = true;
-        if (isAim) mat.depthWrite = true;
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.castShadow = isAim;
-        mesh.receiveShadow = false;
-        mesh.renderOrder = isAim ? 16 : 12;
-        queuePreviewGroup.add(mesh);
-        queuePreviewMeshes[i] = { mesh, type: t };
+        const { group, ball, label } = buildBallGroup(t, rGeom, { ghost: false });
+        ball.material.depthTest = true;
+        if (isAim) ball.material.depthWrite = true;
+        ball.castShadow = isAim;
+        group.renderOrder = isAim ? 16 : 12;
+        queuePreviewGroup.add(group);
+        queuePreviewMeshes[i] = { mesh: group, label, type: t };
       }
     }
 
@@ -988,7 +993,7 @@
       let rMax = 0.18;
       for (let i = 1; i < 4; i++) {
         const e = queuePreviewMeshes[i];
-        if (e) rMax = Math.max(rMax, e.mesh.geometry.parameters.radius);
+        if (e) rMax = Math.max(rMax, FRUITS[e.type].radius * QUEUE_STRIP_SCALE);
       }
       const yRow = yTop - (2 / 3) * rMax - QUEUE_TOP_BAND;
 
@@ -996,7 +1001,7 @@
       for (const i of [3, 2, 1]) {
         const entry = queuePreviewMeshes[i];
         if (!entry) continue;
-        const r = entry.mesh.geometry.parameters.radius;
+        const r = FRUITS[entry.type].radius * QUEUE_STRIP_SCALE;
         cx += r;
         entry.mesh.position.set(cx, yRow, zq);
         cx += r + QUEUE_STRIP_LANE;
@@ -1030,19 +1035,18 @@
       const c = clampDropXZ(worldX, ROW_Z, spec.radius);
       ghostPos.set(c.x, DROP_CENTER_Y, GHOST_Z);
       const aim = queuePreviewMeshes[0];
-      if (aim && !aimPromoteActive) aim.mesh.position.copy(ghostPos);
+      if (aim && !aimPromoteActive) {
+        aim.mesh.position.copy(ghostPos);
+        if (aim.label) updateLabelBillboard(aim.label, camera);
+      }
     }
 
     function spawnFruit(type, x, y, z, opts = {}) {
       const spec = FRUITS[type];
       const r = spec.radius;
       const cx = clampDropXZ(x, ROW_Z, r).x;
-      const geo = new THREE.SphereGeometry(r, 32, 24);
-      const mat = makeFruitMaterial(type, {});
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      scene.add(mesh);
+      const { group, ball, label } = buildBallGroup(type, r, {});
+      scene.add(group);
 
       const shape = new CANNON.Sphere(r);
       const mass = fruitMassForRadius(r);
@@ -1058,10 +1062,9 @@
       body.sleepTimeLimit = physicsTuning.sleepTimeLimit;
       world.addBody(body);
 
-      mesh.position.copy(body.position);
-      mesh.quaternion.copy(body.quaternion);
+      group.position.copy(body.position);
 
-      const entry = { mesh, body, type };
+      const entry = { mesh: group, ball, label, body, type };
       if (opts.fusionPop) {
         entry.fusionT = 0;
         entry.fusionDur = 0.72;
@@ -1071,10 +1074,7 @@
 
     function removeFruit(entry) {
       scene.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      if (entry.mesh.material && typeof entry.mesh.material.dispose === 'function') {
-        entry.mesh.material.dispose();
-      }
+      disposeNumberVisualRoot(entry.mesh);
       world.removeBody(entry.body);
       fruits = fruits.filter((f) => f !== entry);
     }
@@ -1114,14 +1114,10 @@
         comboChain: () => comboChain,
       },
       {
-        mergeResult: 'sumNumbers',
-        typeIndexForNumber,
-        twinTenType: TWIN_TEN_TYPE,
+        mergeResult: 'nextTier',
         jackpotFloatTier: (jpPts) => `★ +${jpPts}`,
-        onJackpotTierExtra: () => showNumberTip('Twin twelves — mega sparkle jackpot!'),
-        jackpotFloatTwinTen: () => 'Wow! Big 10!',
-        onJackpotTwinTenExtra: () =>
-          showNumberTip('10 + 10 is 20 — too big for one ball, so we celebrate instead!'),
+        onJackpotTierExtra: () =>
+          showNumberTip('Twin twelves — mega sparkle jackpot! Clear the stack!'),
         onNormalMergeUi: (mergePts, newType, nx, ny, el) => {
           const fc = new THREE.Color(el.color);
           popFloatText(`+${mergePts} → ${el.number}`, nx, ny + el.radius * 0.42, ROW_Z + 0.48, {
@@ -1346,7 +1342,7 @@
           f.body.velocity.x *= -physicsTuning.wallVelRetain;
         }
         f.mesh.position.copy(f.body.position);
-        f.mesh.quaternion.copy(f.body.quaternion);
+        updateLabelBillboard(f.label, camera);
 
         if (f.fusionDur != null) {
           f.fusionT += dt;
@@ -1378,15 +1374,15 @@
             sy = 1 - 0.04 * (1 - t);
             sz = 1 + 0.05 * (1 - t);
           }
-          f.mesh.scale.set(sx, sy, sz);
-          const m = f.mesh.material;
+          f.ball.scale.set(sx, sy, sz);
+          const m = f.ball.material;
           const baseE = fruitIdleEmissiveIntensity(f.type);
           if (m && typeof m.emissiveIntensity === 'number') {
             const w = Math.sin(Math.PI * Math.min(1, u * 1.35)) * (1 - 0.35 * u);
             m.emissiveIntensity = baseE + 0.58 * w;
           }
           if (u >= 1) {
-            f.mesh.scale.set(1, 1, 1);
+            f.ball.scale.set(1, 1, 1);
             if (m && typeof m.emissiveIntensity === 'number') m.emissiveIntensity = baseE;
             delete f.fusionT;
             delete f.fusionDur;
@@ -1395,6 +1391,10 @@
       }
 
       updateJackpotVanishes(dt);
+
+      for (const q of queuePreviewMeshes) {
+        if (q?.label) updateLabelBillboard(q.label, camera);
+      }
 
       const aimLerp = queuePreviewMeshes[0];
       if (aimPromoteActive && aimLerp) {

@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#3d2a5c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <link rel="icon" href="data:," />
+  <title>Number Stack</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
+      overflow: hidden;
+      background:
+        linear-gradient(188deg, #4a3f6b 0%, #352850 28%, #241a3d 55%, #181028 82%, #0f0a18 100%),
+        radial-gradient(ellipse 95% 55% at 50% 0%, rgba(255, 180, 220, 0.12) 0%, transparent 58%),
+        #0c0814;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 100% 85% at 50% 50%, transparent 0%, rgba(4, 8, 18, 0.65) 65%, rgba(2, 4, 10, 0.92) 100%),
+        radial-gradient(circle at 15% 25%, rgba(100, 140, 200, 0.05) 0%, transparent 38%),
+        radial-gradient(circle at 88% 20%, rgba(200, 120, 80, 0.04) 0%, transparent 36%);
+      animation: bgAura 18s ease-in-out infinite alternate;
+    }
+    @keyframes bgAura {
+      0% { opacity: 0.75; transform: scale(1); }
+      100% { opacity: 1; transform: scale(1.04); }
+    }
+    #danger-panic {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 72% 58% at 50% 44%, transparent 18%, rgba(90, 0, 0, 0.12) 48%, rgba(28, 0, 0, 0.62) 100%),
+        radial-gradient(ellipse 100% 100% at 50% 50%, transparent 42%, rgba(60, 0, 0, 0.35) 100%);
+      opacity: 0;
+      transition: opacity 0.14s linear;
+      mix-blend-mode: multiply;
+    }
+    #hud {
+      position: fixed;
+      right: max(10px, env(safe-area-inset-right, 0px));
+      left: auto;
+      top: max(10px, env(safe-area-inset-top, 0px));
+      z-index: 3;
+      width: min(148px, 38vw);
+      pointer-events: none;
+      text-align: right;
+    }
+    .hud-column {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.55rem;
+    }
+    .hud-brand {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(140, 170, 220, 0.55);
+      text-shadow: 0 0 12px rgba(80, 120, 200, 0.35);
+    }
+    #numberTip {
+      color: rgba(255, 230, 250, 0.82);
+      font-size: 10px;
+      transition: opacity 0.35s ease;
+      max-width: min(200px, 40vw);
+      line-height: 1.35;
+      min-height: 2.4em;
+    }
+    #numberTip.tip-dim {
+      opacity: 0.4;
+    }
+    .hud-brand strong {
+      background: linear-gradient(120deg, #ffd8a8, #ff9ec8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 6px rgba(122, 184, 255, 0.4));
+      animation: buildPulse 4s ease-in-out infinite;
+    }
+    @keyframes buildPulse {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(122, 184, 255, 0.4)); }
+      50% { filter: drop-shadow(0 0 12px rgba(160, 210, 255, 0.75)); }
+    }
+    .hud-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.12rem;
+    }
+    .hud-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(160, 180, 210, 0.65);
+      animation: labelBreathe 5.5s ease-in-out infinite;
+    }
+    @keyframes labelBreathe {
+      0%, 100% { opacity: 0.62; letter-spacing: 0.14em; }
+      50% { opacity: 0.92; letter-spacing: 0.17em; }
+    }
+    .hud-value {
+      font-size: clamp(1.35rem, 6.2vw, 1.85rem);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      background: linear-gradient(165deg, #ffffff 0%, #c8e4ff 35%, #7ab8ff 70%, #5a98e8 100%);
+      background-size: 140% 140%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 10px rgba(100, 170, 255, 0.35)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+      animation: hudValueShine 5s ease-in-out infinite;
+    }
+    @keyframes hudValueShine {
+      0%, 100% { background-position: 0% 40%; }
+      50% { background-position: 100% 60%; }
+    }
+    .hud-value.hud-val-pulse {
+      animation: hudPop 0.38s ease-out, hudValueShine 5s ease-in-out infinite;
+    }
+    @keyframes hudPop {
+      0% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(100, 170, 255, 0.35)); }
+      40% { transform: scale(1.12); filter: drop-shadow(0 0 18px rgba(160, 220, 255, 0.65)); }
+      100% { transform: scale(1); }
+    }
+    .hud-value.hud-merge-flash {
+      animation: hudMergeFlash 0.62s ease-out;
+    }
+    @keyframes hudMergeFlash {
+      0% {
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 20px rgba(255, 230, 160, 0.95)) drop-shadow(0 0 28px rgba(255, 180, 100, 0.55));
+      }
+      100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(100, 170, 255, 0.35)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); }
+    }
+    .hud-value.hud-combo-tick {
+      animation: hudComboTick 0.55s ease-out;
+    }
+    @keyframes hudComboTick {
+      0% {
+        filter: drop-shadow(0 0 18px rgba(255, 210, 140, 0.95)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+        letter-spacing: 0.06em;
+      }
+      100% { filter: inherit; letter-spacing: normal; }
+    }
+    .hud-sub#tierHook.tier-ding {
+      animation: tierDing 0.85s ease-out;
+    }
+    @keyframes tierDing {
+      0% { color: rgba(255, 240, 200, 0.95); transform: translateX(0) scale(1.05); }
+      100% { color: rgba(180, 200, 230, 0.55); transform: translateX(0) scale(1); }
+    }
+    #floatFx {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      overflow: hidden;
+    }
+    .float-pop {
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      color: #fff;
+      text-shadow:
+        0 0 16px currentColor,
+        0 0 28px rgba(255, 255, 255, 0.35),
+        0 3px 10px rgba(0, 0, 0, 0.55);
+      font-size: clamp(15px, 4.2vw, 22px);
+      animation: floatPopUp 1.08s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      transform: translate(-50%, -50%);
+    }
+    .float-pop.jackpot {
+      font-size: clamp(20px, 5.5vw, 32px);
+      letter-spacing: 0.04em;
+    }
+    @keyframes floatPopUp {
+      0% { opacity: 0; transform: translate(-50%, -40%) scale(0.25); }
+      14% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+      32% { transform: translate(-50%, -58%) scale(1); }
+      70% { opacity: 1; transform: translate(-50%, -92%) scale(0.98); }
+      100% { opacity: 0; transform: translate(-50%, -140%) scale(0.82); }
+    }
+    .hud-sub {
+      font-size: 10px;
+      color: rgba(180, 200, 230, 0.55);
+      max-width: 100%;
+    }
+    .hud-sub span {
+      color: rgba(210, 230, 255, 0.85);
+      font-weight: 600;
+    }
+    .hud-hint {
+      margin-top: 0.35rem;
+      font-size: 10px;
+      color: rgba(150, 170, 200, 0.45);
+    }
+    .hud-link {
+      pointer-events: auto;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .hud-link:hover {
+      text-decoration: underline;
+    }
+    .help-link {
+      pointer-events: auto;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .help-link:hover {
+      text-decoration: underline;
+    }
+    .hud-value.combo-blazing {
+      animation: comboBlaze 0.55s ease-in-out infinite alternate, hudValueShine 5s ease-in-out infinite;
+      filter: drop-shadow(0 0 14px rgba(255, 200, 120, 0.55)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    }
+    @keyframes comboBlaze {
+      0% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(255, 190, 100, 0.4)); }
+      100% { transform: scale(1.06); filter: drop-shadow(0 0 22px rgba(255, 220, 140, 0.75)); }
+    }
+    #hud kbd {
+      background: rgba(30, 40, 60, 0.85);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 10px;
+      border: 1px solid rgba(100, 130, 180, 0.25);
+    }
+    #overlay {
+      display: none; position: fixed; inset: 0; z-index: 6;
+      align-items: center; justify-content: center;
+      background: rgba(4, 6, 14, 0.88); color: #fff; font-size: clamp(18px, 4vw, 28px);
+      text-align: center; padding: 24px; padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+    }
+    #overlayRestart {
+      margin-top: 1.25rem;
+      padding: 0.85rem 1.75rem;
+      min-height: 48px;
+      min-width: min(220px, 72vw);
+      font-size: clamp(16px, 4.2vw, 20px);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #0c101c;
+      background: linear-gradient(165deg, #e8f2ff 0%, #9ec5ff 45%, #5a98e8 100%);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+      box-shadow: 0 6px 24px rgba(80, 140, 220, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    #overlayRestart:active {
+      transform: scale(0.97);
+      box-shadow: 0 3px 14px rgba(60, 120, 200, 0.4);
+    }
+    #overlayTitle {
+      background: linear-gradient(135deg, #fff, #a8c8ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 20px rgba(120, 170, 255, 0.4));
+    }
+    #overlay.visible {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+    }
+    #help {
+      position: fixed;
+      right: max(10px, env(safe-area-inset-right, 0px));
+      bottom: max(10px, env(safe-area-inset-bottom, 0px));
+      z-index: 3;
+      color: #a8b4c8; font-size: clamp(11px, 2.9vw, 13px);
+      max-width: min(240px, 42vw); text-align: right;
+      line-height: 1.4;
+      pointer-events: none;
+    }
+    canvas { display: block; touch-action: none; }
+    .phys-dbg-wrap {
+      position: fixed;
+      left: max(8px, env(safe-area-inset-left, 0px));
+      bottom: max(8px, env(safe-area-inset-bottom, 0px));
+      z-index: 5;
+      font-size: 11px; color: #ccc; max-width: min(320px, 92vw);
+      pointer-events: none;
+    }
+    .phys-dbg-wrap button, .phys-dbg-wrap input { pointer-events: auto; }
+    .phys-dbg-tab {
+      background: #1a2233; border: 1px solid #3d4f7c; color: #9db7ff;
+      padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    }
+    .phys-dbg-tab:hover { background: #243049; }
+    .phys-dbg-panel {
+      margin-top: 6px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(12, 14, 22, 0.94); border: 1px solid #2a3548;
+      max-height: min(52vh, 420px); overflow-y: auto; pointer-events: auto;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    }
+    .phys-dbg-panel h3 { margin: 0 0 8px; font-size: 12px; color: #7ab8ff; font-weight: 600; }
+    .phys-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; align-items: center; margin-bottom: 8px; }
+    .phys-row label { color: #9aa4b8; grid-column: 1 / -1; }
+    .phys-row input[type="range"] { width: 100%; }
+    .phys-val { color: #7dffb3; font-variant-numeric: tabular-nums; text-align: right; min-width: 3.2em; }
+    .phys-preset-bar {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+    }
+    .phys-preset-btn {
+      flex: 1 1 auto; min-width: 5.5em;
+      background: #243049; border: 1px solid #4a6094; color: #c8dcff;
+      padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600;
+    }
+    .phys-preset-btn:hover { background: #2c3a58; }
+    .phys-fine-tune { margin-top: 4px; border-top: 1px solid #2a3548; padding-top: 8px; }
+    .phys-fine-tune summary {
+      cursor: pointer; color: #8aa8d8; font-size: 11px; margin-bottom: 8px; user-select: none;
+    }
+    .phys-fine-tune summary::-webkit-details-marker { color: #7ab8ff; }
+  </style>
+</head>
+<body>
+  <div id="danger-panic" aria-hidden="true"></div>
+  <div id="floatFx" aria-hidden="true"></div>
+  <div id="hud">
+    <div class="hud-column">
+      <div class="hud-brand">number stack <strong id="buildId">v2 · face-you digits</strong></div>
+      <div class="hud-stat">
+        <span class="hud-label">Score</span>
+        <span class="hud-value" id="scoreVal">0</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-label">Level</span>
+        <span class="hud-value" id="levelVal">1</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-label">Combo</span>
+        <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
+      </div>
+      <div class="hud-sub">Next <span id="nextLvlVal">200</span> pts</div>
+      <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Level 1 — Let's count!</div>
+      <div class="hud-sub" id="numberTip" style="margin-top:0.35rem"></div>
+      <div class="hud-hint">
+        <a class="hud-link" href="fruit-merge-3d-demo.html" style="color:rgba(255,210,180,0.95)">Marbles →</a>
+        · <a class="hud-link" href="atoms-merge-3d-demo.html" style="color:rgba(200,230,255,0.9)">Atoms →</a>
+        · <a class="hud-link" href="index.html" style="color:rgba(230,200,255,0.85)">Menu</a><br />
+        <kbd>F</kbd> full
+      </div>
+    </div>
+  </div>
+  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle" aria-hidden="true">
+    <div id="overlayTitle">Game over</div>
+    <div id="overlaySub" style="font-size:55%;opacity:.9">The jar filled to the tippy top!</div>
+    <div style="font-size:45%;opacity:.75;margin-top:8px">
+      <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> on keyboard · or tap below
+    </div>
+    <button type="button" id="overlayRestart">Restart</button>
+  </div>
+  <div id="help">
+    Same number + same number = <strong>next bigger number!</strong> (1+1→2, 2+2→3, …) · Twin 12s = sparkle jackpot<br />
+    <kbd>R</kbd> restart · <kbd>F</kbd> full · <kbd>D</kbd> debug ·
+    <a class="help-link" href="fruit-merge-3d-demo.html" style="color:#ffc8a8">Marbles</a> ·
+    <a class="help-link" href="atoms-merge-3d-demo.html" style="color:#a8e8ff">Atoms</a> ·
+    <a class="help-link" href="index.html" style="color:#e8c8ff">Menu</a>
+  </div>
+
+  <div class="phys-dbg-wrap" id="physDbgWrap">
+    <button type="button" class="phys-dbg-tab" id="physDbgTab" aria-expanded="false">Physics debug ▲</button>
+    <div class="phys-dbg-panel" id="physDbgPanel" hidden>
+      <h3>Physics</h3>
+      <div class="phys-preset-bar" id="phys-preset-bar">
+        <button type="button" class="phys-preset-btn" data-preset="ceramic">Ceramic</button>
+        <button type="button" class="phys-preset-btn" data-preset="heavy">Very heavy</button>
+        <button type="button" class="phys-preset-btn" data-preset="underwater">Underwater</button>
+      </div>
+      <details class="phys-fine-tune">
+        <summary>Fine-tune sliders</summary>
+      <div class="phys-row"><label for="pt-gravity">Gravity (down)</label>
+        <input type="range" id="pt-gravity" data-key="gravity" min="14" max="48" step="1" />
+        <span class="phys-val" id="ptv-gravity"></span></div>
+      <div class="phys-row"><label for="pt-restF">Bounce fruit–fruit</label>
+        <input type="range" id="pt-restF" data-key="restitutionFruit" min="0" max="0.95" step="0.01" />
+        <span class="phys-val" id="ptv-restitutionFruit"></span></div>
+      <div class="phys-row"><label for="pt-restD">Bounce vs floor/walls</label>
+        <input type="range" id="pt-restD" data-key="restitutionDefault" min="0" max="0.22" step="0.01" />
+        <span class="phys-val" id="ptv-restitutionDefault"></span></div>
+      <div class="phys-row"><label for="pt-frF">Friction fruit–fruit</label>
+        <input type="range" id="pt-frF" data-key="frictionFruit" min="0.25" max="0.98" step="0.01" />
+        <span class="phys-val" id="ptv-frictionFruit"></span></div>
+      <div class="phys-row"><label for="pt-frD">Friction vs cup</label>
+        <input type="range" id="pt-frD" data-key="frictionDefault" min="0.25" max="0.98" step="0.01" />
+        <span class="phys-val" id="ptv-frictionDefault"></span></div>
+      <div class="phys-row"><label for="pt-linD">Linear damping</label>
+        <input type="range" id="pt-linD" data-key="linearDamping" min="0.005" max="0.88" step="0.005" />
+        <span class="phys-val" id="ptv-linearDamping"></span></div>
+      <div class="phys-row"><label for="pt-angD">Angular damping</label>
+        <input type="range" id="pt-angD" data-key="angularDamping" min="0.05" max="0.99" step="0.01" />
+        <span class="phys-val" id="ptv-angularDamping"></span></div>
+      <div class="phys-row"><label for="pt-sleepS">Sleep speed limit</label>
+        <input type="range" id="pt-sleepS" data-key="sleepSpeedLimit" min="0.08" max="0.45" step="0.01" />
+        <span class="phys-val" id="ptv-sleepSpeedLimit"></span></div>
+      <div class="phys-row"><label for="pt-sleepT">Sleep time limit</label>
+        <input type="range" id="pt-sleepT" data-key="sleepTimeLimit" min="0.08" max="0.75" step="0.02" />
+        <span class="phys-val" id="ptv-sleepTimeLimit"></span></div>
+      <div class="phys-row"><label for="pt-wall">Side wall velocity keep</label>
+        <input type="range" id="pt-wall" data-key="wallVelRetain" min="0" max="0.18" step="0.01" />
+        <span class="phys-val" id="ptv-wallVelRetain"></span></div>
+      <div class="phys-row"><label for="pt-merge">Merge velocity keep</label>
+        <input type="range" id="pt-merge" data-key="mergeVelScale" min="0" max="0.35" step="0.01" />
+        <span class="phys-val" id="ptv-mergeVelScale"></span></div>
+      <div class="phys-row"><label for="pt-drop">Drop downward speed</label>
+        <input type="range" id="pt-drop" data-key="dropVy" min="0.12" max="0.48" step="0.01" />
+        <span class="phys-val" id="ptv-dropVy"></span></div>
+      <div class="phys-row"><label for="pt-stiff">Contact stiffness (×1e6)</label>
+        <input type="range" id="pt-stiff" data-key="contactStiffness6" min="25" max="240" step="1" />
+        <span class="phys-val" id="ptv-contactStiffness6"></span></div>
+      <div class="phys-row"><label for="pt-relax">Contact relaxation</label>
+        <input type="range" id="pt-relax" data-key="contactRelaxation" min="2" max="12" step="0.5" />
+        <span class="phys-val" id="ptv-contactRelaxation"></span></div>
+      <div class="phys-row"><label for="pt-solver">Solver iterations</label>
+        <input type="range" id="pt-solver" data-key="solverIterations" min="8" max="55" step="1" />
+        <span class="phys-val" id="ptv-solverIterations"></span></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Local vendor/ so the game works offline and when CDN DNS fails (ERR_NAME_NOT_RESOLVED) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "cannon-es": "./vendor/cannon-es.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import * as CANNON from 'cannon-es';
+    import {
+      ROW_Z,
+      GHOST_Z,
+      QUEUE_STRIP_SCALE,
+      QUEUE_STRIP_LANE,
+      QUEUE_TOP_BAND,
+      fruitMassForRadius,
+      FRUITS,
+      MERGE_POINTS,
+      MERGEABLE_TYPE_MAX,
+      CUP_BASE,
+      DROP_TYPE_MAX,
+      DROP_COOLDOWN_MS,
+      GAME_OVER_DWELL_SEC,
+      COMBO_CHAIN_SEC,
+      COMBO_MAX_MULT,
+      COMBO_MULT_PER_TIER,
+      DANGER_PULSE_BAND,
+      DROP_VY_PER_LEVEL,
+      DROP_VY_LEVEL_CAP,
+      MERGE_DIST_MULT,
+      JACKPOT_MERGE_DIST_MULT,
+      LEVEL_GOAL_START,
+      LEVEL_GOAL_SCALE,
+      LEVEL_GOAL_ADD,
+      GAME_OVER_BELOW_RIM,
+    } from './js/config-numbers.js';
+    import { createSfx } from './js/sfx.js';
+    import { createJuice } from './js/effects.js';
+    import { physicsTuning, createPhysicsWorld, applyPhysicsPreset } from './js/physics.js';
+    import {
+      attachSceneBackground,
+      createRendererAndCamera,
+      addDefaultLights,
+      aimKeyLightAt,
+    } from './js/render.js';
+    import { initPhysicsDebugUI, togglePhysDebugPanel } from './js/ui.js';
+    import { vibrateMerge, vibrateJackpot, cancelVibration } from './js/haptics.js';
+    import { applyStudioEnvironment } from './js/environment.js';
+    import { createOrthoViewportLayout } from './js/viewport-ortho.js';
+    import { createPlayfieldCup } from './js/playfield-cup.js';
+    import { createTryMerge } from './js/merge-engine.js';
+    import {
+      createNumberDigitSprite,
+      updateLabelBillboard,
+      setNumberLabelScale,
+      placeDigitInFrontOfSphere,
+    } from './js/ball-label-sprite.js';
+
+    let CUP = { ...CUP_BASE, wallH: 11 };
+    /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
+    let DROP_CENTER_Y = CUP.wallH - 0.55;
+    let GAME_OVER_Y = CUP.wallH - GAME_OVER_BELOW_RIM;
+
+    const scoreEl = document.getElementById('scoreVal');
+    const levelEl = document.getElementById('levelVal');
+    const nextLvlEl = document.getElementById('nextLvlVal');
+    const tierHookEl = document.getElementById('tierHook');
+    const numberTipEl = document.getElementById('numberTip');
+    const panicEl = document.getElementById('danger-panic');
+    const floatFxEl = document.getElementById('floatFx');
+    const overlay = document.getElementById('overlay');
+    const overlayRestart = document.getElementById('overlayRestart');
+
+    let score = 0;
+    let level = 1;
+    let levelScoreGoal = LEVEL_GOAL_START;
+    let gameOver = false;
+
+    let lastDropTime = 0;
+
+    /** Require pile above line for this long (seconds) — ignores one-frame physics spikes */
+    let gameOverDwell = 0;
+
+    const Sfx = createSfx();
+    document.body.addEventListener('pointerdown', () => Sfx.resume(), { passive: true });
+
+    const comboMultEl = document.getElementById('comboMultVal');
+    let comboChain = 0;
+    let lastMergeAtMs = 0;
+    let tensionTime = 0;
+
+    /** Hit pause: skip sim / juice advance for a few frames — big merge feel */
+    let hitPause = 0;
+    function queueHitPause(duration = 0.055) {
+      hitPause = Math.max(hitPause, duration);
+    }
+
+    let heartbeatAcc = 0;
+
+    function tierLabelForLevel(lv) {
+      return `Level ${lv} — Let's count!`;
+    }
+
+    let numberTipTimer = 0;
+    function showNumberTip(text) {
+      if (!numberTipEl || !text) return;
+      if (numberTipTimer) window.clearTimeout(numberTipTimer);
+      numberTipEl.classList.remove('tip-dim');
+      numberTipEl.textContent = text;
+      numberTipTimer = window.setTimeout(() => {
+        numberTipEl.classList.add('tip-dim');
+      }, 4800);
+    }
+
+    function updatePanicVisuals(stress) {
+      if (!panicEl) return;
+      const t = Math.max(0, (stress - 0.22) / 0.78);
+      panicEl.style.opacity = String(0.04 + t * t * 0.82);
+    }
+
+    function syncHud() {
+      scoreEl.textContent = String(score);
+      levelEl.textContent = String(level);
+      nextLvlEl.textContent = String(levelScoreGoal);
+      if (tierHookEl) tierHookEl.textContent = tierLabelForLevel(level);
+      if (comboMultEl) {
+        const now = performance.now();
+        const dead = now - lastMergeAtMs > COMBO_CHAIN_SEC * 1000;
+        if (comboChain <= 0 || dead) {
+          comboMultEl.textContent = '—';
+          comboMultEl.classList.remove('combo-blazing');
+        } else {
+          const nextM = Math.min(COMBO_MAX_MULT, 1 + comboChain * COMBO_MULT_PER_TIER);
+          comboMultEl.textContent = `×${nextM % 1 === 0 ? String(nextM) : nextM.toFixed(2)}`;
+        }
+      }
+    }
+
+    function pulseHudValue(el) {
+      if (!el) return;
+      el.classList.remove('hud-val-pulse');
+      void el.offsetWidth;
+      el.classList.add('hud-val-pulse');
+    }
+
+    function flashHudMerge(el) {
+      if (!el) return;
+      el.classList.remove('hud-merge-flash');
+      void el.offsetWidth;
+      el.classList.add('hud-merge-flash');
+    }
+
+    function worldToScreen(wx, wy, wz) {
+      const v = new THREE.Vector3(wx, wy, wz);
+      v.project(camera);
+      const rect = canvasEl.getBoundingClientRect();
+      const x = rect.left + (v.x * 0.5 + 0.5) * rect.width;
+      const y = rect.top + (-v.y * 0.5 + 0.5) * rect.height;
+      return { x, y, onScreen: v.z < 1 && v.z > -1 };
+    }
+
+    function popFloatText(text, wx, wy, wz, { jackpot = false, color = '#fff4d8' } = {}) {
+      if (!floatFxEl || !text) return;
+      const { x, y, onScreen } = worldToScreen(wx, wy, wz);
+      if (!onScreen) return;
+      const el = document.createElement('div');
+      el.className = jackpot ? 'float-pop jackpot' : 'float-pop';
+      el.textContent = text;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.style.color = color;
+      floatFxEl.appendChild(el);
+      el.addEventListener(
+        'animationend',
+        () => {
+          el.remove();
+        },
+        { once: true },
+      );
+    }
+
+    function mergeComboMultBeforeBump() {
+      const now = performance.now();
+      if (now - lastMergeAtMs > COMBO_CHAIN_SEC * 1000) comboChain = 0;
+      return Math.min(COMBO_MAX_MULT, 1 + comboChain * COMBO_MULT_PER_TIER);
+    }
+
+    function bumpMergeCombo() {
+      const now = performance.now();
+      if (now - lastMergeAtMs > COMBO_CHAIN_SEC * 1000) comboChain = 0;
+      lastMergeAtMs = now;
+      comboChain += 1;
+      syncHud();
+      pulseHudValue(comboMultEl);
+      if (comboMultEl) {
+        comboMultEl.classList.remove('hud-combo-tick');
+        void comboMultEl.offsetWidth;
+        comboMultEl.classList.add('hud-combo-tick');
+        comboMultEl.classList.toggle('combo-blazing', comboChain >= 2);
+      }
+    }
+
+    function resetCombo() {
+      comboChain = 0;
+      lastMergeAtMs = 0;
+      if (comboMultEl) comboMultEl.classList.remove('combo-blazing');
+      syncHud();
+    }
+
+    function effectiveDropVy() {
+      const extra = Math.min(DROP_VY_LEVEL_CAP, level * DROP_VY_PER_LEVEL);
+      return physicsTuning.dropVy * (1 + extra);
+    }
+
+    function addScore(delta, { skipScorePulse = false } = {}) {
+      if (delta <= 0) return;
+      score += delta;
+      let leveled = false;
+      while (score >= levelScoreGoal) {
+        score -= levelScoreGoal;
+        level += 1;
+        levelScoreGoal = Math.floor(levelScoreGoal * LEVEL_GOAL_SCALE + LEVEL_GOAL_ADD);
+        leveled = true;
+      }
+      syncHud();
+      if (!skipScorePulse) pulseHudValue(scoreEl);
+      if (leveled) {
+        Sfx.playLevelUp();
+        pulseHudValue(levelEl);
+        if (tierHookEl) {
+          tierHookEl.classList.remove('tier-ding');
+          void tierHookEl.offsetWidth;
+          tierHookEl.classList.add('tier-ding');
+        }
+      }
+    }
+
+    // --- Three (scene + renderer from js/render.js)
+    const scene = new THREE.Scene();
+    attachSceneBackground(scene);
+    scene.fog = null;
+
+    const { renderer, camera, canvasEl } = createRendererAndCamera();
+    const juice = createJuice(scene);
+    const { sun: keyLight } = addDefaultLights(scene);
+    applyStudioEnvironment(renderer, scene);
+
+    const {
+      state: orthoLayout,
+      getViewportSize,
+      updateCameraFrustum,
+      syncCanvasToViewport,
+      getOrthoAhHalf,
+      canvasCenterClient,
+      applyCupOrthoFrame,
+    } = createOrthoViewportLayout({ renderer, camera, canvasEl });
+
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+
+    let fruitSharedTextures = null;
+    const elementFaceTextures = [];
+
+    function buildFruitSharedTextures() {
+      const n2 = 128;
+      const c2 = document.createElement('canvas');
+      c2.width = n2;
+      c2.height = n2;
+      const g2 = c2.getContext('2d');
+      const im = g2.createImageData(n2, n2);
+      for (let i = 0; i < im.data.length; i += 4) {
+        const v = 118 + Math.random() * 100;
+        im.data[i] = im.data[i + 1] = im.data[i + 2] = v;
+        im.data[i + 3] = 255;
+      }
+      g2.putImageData(im, 0, 0);
+      const roughnessMap = new THREE.CanvasTexture(c2);
+      roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+      roughnessMap.repeat.set(3, 3);
+      roughnessMap.colorSpace = THREE.NoColorSpace;
+      return { roughnessMap };
+    }
+
+    /** Sphere skin only — digit is a billboard sprite (always faces player). */
+    function numberFaceMap(type) {
+      if (elementFaceTextures[type]) return elementFaceTextures[type];
+      const spec = FRUITS[type];
+      const s = 256;
+      const c = document.createElement('canvas');
+      c.width = s;
+      c.height = s;
+      const ctx = c.getContext('2d');
+      const tc = new THREE.Color(spec.color);
+      const g = ctx.createRadialGradient(s * 0.4, s * 0.35, s * 0.08, s * 0.5, s * 0.5, s * 0.65);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.4, `#${tc.getHexString()}`);
+      g.addColorStop(1, '#222222');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      elementFaceTextures[type] = tex;
+      return tex;
+    }
+
+    function initFruitVisuals() {
+      if (!fruitSharedTextures) fruitSharedTextures = buildFruitSharedTextures();
+    }
+
+    function fruitIdleEmissiveIntensity(type) {
+      const tNorm = FRUITS.length > 1 ? type / (FRUITS.length - 1) : 0;
+      return 0.02 + tNorm * 0.025;
+    }
+
+    function buildBallGroup(type, r, { ghost = false } = {}) {
+      const spec = FRUITS[type];
+      const geo = new THREE.SphereGeometry(r, 32, 24);
+      const mat = makeFruitMaterial(type, { ghost });
+      const ball = new THREE.Mesh(geo, mat);
+      ball.castShadow = !ghost;
+      ball.receiveShadow = true;
+      const label = createNumberDigitSprite(spec);
+      setNumberLabelScale(label, r);
+      placeDigitInFrontOfSphere(label, r);
+      const group = new THREE.Group();
+      group.add(ball);
+      group.add(label);
+      return { group, ball, label };
+    }
+
+    /** Number spheres: gradient skin; digit on billboard sprite */
+    function makeFruitMaterial(type, { ghost = false } = {}) {
+      initFruitVisuals();
+      const spec = FRUITS[type];
+      const tNorm = FRUITS.length > 1 ? type / (FRUITS.length - 1) : 0;
+      const { roughnessMap } = fruitSharedTextures;
+      const faceMap = numberFaceMap(type);
+
+      if (ghost) {
+        return new THREE.MeshPhysicalMaterial({
+          color: 0xffffff,
+          map: faceMap,
+          roughnessMap,
+          roughness: 0.18,
+          metalness: 0,
+          transmission: 0.72,
+          thickness: 0.95,
+          ior: 1.5,
+          specularIntensity: 0.85,
+          specularColor: new THREE.Color(0xffffff),
+          clearcoat: 0.28,
+          clearcoatRoughness: 0.14,
+          emissive: spec.color,
+          emissiveIntensity: 0.12 + tNorm * 0.06,
+          envMapIntensity: 1.15,
+          transparent: true,
+          depthWrite: true,
+        });
+      }
+
+      return new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        map: faceMap,
+        roughnessMap,
+        roughness: 0.22,
+        metalness: 0,
+        transmission: 0.18 + tNorm * 0.08,
+        thickness: 0.55 + tNorm * 0.32,
+        ior: 1.52,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(0xffffff),
+        clearcoat: 0.38,
+        clearcoatRoughness: 0.12,
+        attenuationColor: spec.color,
+        attenuationDistance: 0.55 + tNorm * 0.42,
+        emissive: spec.color,
+        emissiveIntensity: fruitIdleEmissiveIntensity(type),
+        envMapIntensity: 1.05,
+        depthWrite: true,
+      });
+    }
+
+    initFruitVisuals();
+
+    const queuePreviewGroup = new THREE.Group();
+    queuePreviewGroup.renderOrder = 14;
+    scene.add(queuePreviewGroup);
+
+    const { world, physicsMaterial, fruitContact, applyPhysicsTuning: applyPhysicsTuningToBodies } =
+      createPhysicsWorld();
+
+    const {
+      cupGroup,
+      innerHalfXForRadius,
+      clampDropXZ,
+      applyCupLayout,
+      dangerLine,
+    } = createPlayfieldCup({
+      scene,
+      world,
+      camera,
+      keyLight,
+      aimKeyLightAt,
+      getViewportSize,
+      applyCupOrthoFrame,
+      syncCanvasToViewport,
+      ROW_Z,
+      CUP_BASE,
+      CUP,
+      getDropCenterY: () => DROP_CENTER_Y,
+      setDropCenterY: (v) => {
+        DROP_CENTER_Y = v;
+      },
+      getGameOverY: () => GAME_OVER_Y,
+      setGameOverY: (v) => {
+        GAME_OVER_Y = v;
+      },
+      GAME_OVER_BELOW_RIM,
+      themeId: 'numbers',
+    });
+
+    /** @type {{ mesh: THREE.Group, ball: THREE.Mesh, label: THREE.Sprite, body: CANNON.Body, type: number, fusionT?: number, fusionDur?: number }[]} */
+    let fruits = [];
+
+    function applyPhysicsTuning() {
+      applyPhysicsTuningToBodies(fruits);
+    }
+
+    /** Meshes only: physics already removed while browns shrink to zero (short VFX). */
+    let jackpotVanishes = [];
+    let mergeCooldown = 0;
+
+    function disposeNumberVisualRoot(root) {
+      root.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          for (const m of mats) {
+            if (m.map) m.map.dispose();
+            m.dispose?.();
+          }
+        }
+      });
+    }
+
+    function disposeJackpotVanishAll() {
+      for (const v of jackpotVanishes) {
+        scene.remove(v.mesh);
+        disposeNumberVisualRoot(v.mesh);
+      }
+      jackpotVanishes.length = 0;
+    }
+
+    function beginJackpotVanish(entry) {
+      const root = entry.mesh;
+      root.position.copy(entry.body.position);
+      root.scale.setScalar(1);
+      world.removeBody(entry.body);
+      fruits = fruits.filter((f) => f !== entry);
+      const mat = entry.ball.material;
+      const baseEmissive = mat && typeof mat.emissiveIntensity === 'number' ? mat.emissiveIntensity : 0.08;
+      jackpotVanishes.push({
+        mesh: root,
+        ball: entry.ball,
+        t: 0,
+        dur: 0.2,
+        baseEmissive,
+      });
+    }
+
+    function updateJackpotVanishes(dt) {
+      for (let i = jackpotVanishes.length - 1; i >= 0; i--) {
+        const v = jackpotVanishes[i];
+        v.t += dt;
+        const u = Math.min(1, v.t / v.dur);
+        const s = Math.max(0.0001, 1 - u);
+        v.mesh.scale.setScalar(s);
+        const mat = v.ball.material;
+        if (mat && typeof mat.emissiveIntensity === 'number') {
+          mat.emissiveIntensity = v.baseEmissive + 0.65 * u;
+        }
+        if (u >= 1) {
+          scene.remove(v.mesh);
+          disposeNumberVisualRoot(v.mesh);
+          jackpotVanishes.splice(i, 1);
+        }
+      }
+    }
+
+    /** Random among smallest several tiers (not only cherry+grape). */
+    function rollQueuedDropType() {
+      return Math.floor(Math.random() * (DROP_TYPE_MAX + 1));
+    }
+
+    /** [0] = next drop (follows aim — same mesh as will spawn); [1],[2],[3] = upcoming strip. */
+    /** @type {number[]} */
+    let dropQueue = [];
+    function refillDropQueue() {
+      while (dropQueue.length < 4) dropQueue.push(rollQueuedDropType());
+    }
+
+    /** @type {{ mesh: THREE.Mesh, type: number }[]} */
+    const queuePreviewMeshes = [];
+
+    const ghostPos = new THREE.Vector3(0, DROP_CENTER_Y, GHOST_Z);
+    let aimPromoteActive = false;
+    let aimPromoteElapsed = 0;
+    const AIM_PROMOTE_SEC = 0.28;
+    const aimPromoteStart = new THREE.Vector3();
+
+    function ensureQueuePreviewTypes() {
+      refillDropQueue();
+      for (let i = 0; i < 4; i++) {
+        const t = dropQueue[i];
+        const existing = queuePreviewMeshes[i];
+        if (existing && existing.type === t) continue;
+        if (existing) {
+          queuePreviewGroup.remove(existing.mesh);
+          disposeNumberVisualRoot(existing.mesh);
+        }
+        const isAim = i === 0;
+        const rGeom = isAim ? FRUITS[t].radius : FRUITS[t].radius * QUEUE_STRIP_SCALE;
+        const { group, ball, label } = buildBallGroup(t, rGeom, { ghost: false });
+        ball.material.depthTest = true;
+        if (isAim) ball.material.depthWrite = true;
+        ball.castShadow = isAim;
+        group.renderOrder = isAim ? 16 : 12;
+        queuePreviewGroup.add(group);
+        queuePreviewMeshes[i] = { mesh: group, label, type: t };
+      }
+    }
+
+    /** [0] at aim; strip stays on inner left — left→right = later → sooner, so [3][2][1] and “next” hugs center. */
+    function layoutQueuePreviewMeshes() {
+      const active = queuePreviewMeshes[0];
+      if (active && !aimPromoteActive) active.mesh.position.copy(ghostPos);
+
+      const innerL = -(CUP.halfX - CUP.wallT);
+      const inset = 0.06;
+      const zq = GHOST_Z;
+      const yTop = orthoLayout.orthoMidY + getOrthoAhHalf();
+      let rMax = 0.18;
+      for (let i = 1; i < 4; i++) {
+        const e = queuePreviewMeshes[i];
+        if (e) rMax = Math.max(rMax, FRUITS[e.type].radius * QUEUE_STRIP_SCALE);
+      }
+      const yRow = yTop - (2 / 3) * rMax - QUEUE_TOP_BAND;
+
+      let cx = innerL + inset;
+      for (const i of [3, 2, 1]) {
+        const entry = queuePreviewMeshes[i];
+        if (!entry) continue;
+        const r = FRUITS[entry.type].radius * QUEUE_STRIP_SCALE;
+        cx += r;
+        entry.mesh.position.set(cx, yRow, zq);
+        cx += r + QUEUE_STRIP_LANE;
+      }
+    }
+
+    function syncDropQueuePreviews() {
+      refillDropQueue();
+      ensureQueuePreviewTypes();
+    }
+
+    refillDropQueue();
+
+    applyPhysicsTuning();
+
+    function pendingDropType() {
+      refillDropQueue();
+      return dropQueue[0];
+    }
+
+    function updateGhostAt(clientX, clientY) {
+      const t = pendingDropType();
+      ensureQueuePreviewTypes();
+      const spec = FRUITS[t];
+      const rect = renderer.domElement.getBoundingClientRect();
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height);
+      const ndcX = ((clientX - rect.left) / w) * 2 - 1;
+      const worldX =
+        camera.left + ((ndcX + 1) / 2) * (camera.right - camera.left);
+      const c = clampDropXZ(worldX, ROW_Z, spec.radius);
+      ghostPos.set(c.x, DROP_CENTER_Y, GHOST_Z);
+      const aim = queuePreviewMeshes[0];
+      if (aim && !aimPromoteActive) {
+        aim.mesh.position.copy(ghostPos);
+        if (aim.label) updateLabelBillboard(aim.label, camera);
+      }
+    }
+
+    function spawnFruit(type, x, y, z, opts = {}) {
+      const spec = FRUITS[type];
+      const r = spec.radius;
+      const cx = clampDropXZ(x, ROW_Z, r).x;
+      const { group, ball, label } = buildBallGroup(type, r, {});
+      scene.add(group);
+
+      const shape = new CANNON.Sphere(r);
+      const mass = fruitMassForRadius(r);
+      const body = new CANNON.Body({
+        mass,
+        linearDamping: physicsTuning.linearDamping,
+        angularDamping: physicsTuning.angularDamping,
+        material: physicsMaterial,
+      });
+      body.addShape(shape);
+      body.position.set(cx, y, ROW_Z);
+      body.sleepSpeedLimit = physicsTuning.sleepSpeedLimit;
+      body.sleepTimeLimit = physicsTuning.sleepTimeLimit;
+      world.addBody(body);
+
+      group.position.copy(body.position);
+
+      const entry = { mesh: group, ball, label, body, type };
+      if (opts.fusionPop) {
+        entry.fusionT = 0;
+        entry.fusionDur = 0.72;
+      }
+      fruits.push(entry);
+    }
+
+    function removeFruit(entry) {
+      scene.remove(entry.mesh);
+      disposeNumberVisualRoot(entry.mesh);
+      world.removeBody(entry.body);
+      fruits = fruits.filter((f) => f !== entry);
+    }
+
+    const tryMerge = createTryMerge(
+      {
+        getGameOver: () => gameOver,
+        getMergeCooldown: () => mergeCooldown,
+        setMergeCooldown: (n) => {
+          mergeCooldown = n;
+        },
+        juice,
+        getFruits: () => fruits,
+        removeFruit,
+        spawnFruit,
+        innerHalfXForRadius,
+        ROW_Z,
+        FRUITS,
+        MERGE_POINTS,
+        MERGEABLE_TYPE_MAX,
+        MERGE_DIST_MULT,
+        JACKPOT_MERGE_DIST_MULT,
+        COMBO_CHAIN_SEC,
+        physicsTuning,
+        mergeComboMultBeforeBump,
+        bumpMergeCombo,
+        queueHitPause,
+        beginJackpotVanish,
+        addScore,
+        popFloatText,
+        flashHudMerge,
+        scoreEl,
+        Sfx,
+        vibrateJackpot,
+        vibrateMerge,
+        lastMergeAtMs: () => lastMergeAtMs,
+        comboChain: () => comboChain,
+      },
+      {
+        mergeResult: 'nextTier',
+        jackpotFloatTier: (jpPts) => `★ +${jpPts}`,
+        onJackpotTierExtra: () =>
+          showNumberTip('Twin twelves — mega sparkle jackpot! Clear the stack!'),
+        onNormalMergeUi: (mergePts, newType, nx, ny, el) => {
+          const fc = new THREE.Color(el.color);
+          popFloatText(`+${mergePts} → ${el.number}`, nx, ny + el.radius * 0.42, ROW_Z + 0.48, {
+            color: `#${fc.getHexString()}`,
+          });
+          showNumberTip(`${el.number}: ${el.fact}`);
+        },
+      },
+    );
+
+    function checkGameOver(dt) {
+      if (gameOver) return;
+      let anyOver = false;
+      for (const f of fruits) {
+        const r = FRUITS[f.type].radius;
+        if (f.body.position.y + r >= GAME_OVER_Y) {
+          anyOver = true;
+          break;
+        }
+      }
+      if (anyOver) {
+        gameOverDwell += dt;
+        if (gameOverDwell >= GAME_OVER_DWELL_SEC) {
+          gameOver = true;
+          overlay.classList.add('visible');
+          overlay.setAttribute('aria-hidden', 'false');
+          Sfx.playGameOver();
+          queueMicrotask(() => overlayRestart?.focus({ preventScroll: true }));
+        }
+      } else {
+        gameOverDwell = 0;
+      }
+    }
+
+    function fullReset() {
+      disposeJackpotVanishAll();
+      fruits.slice().forEach(removeFruit);
+      dropQueue.length = 0;
+      refillDropQueue();
+      mergeCooldown = 0;
+      score = 0;
+      level = 1;
+      levelScoreGoal = LEVEL_GOAL_START;
+      resetCombo();
+      gameOver = false;
+      gameOverDwell = 0;
+      lastDropTime = 0;
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden', 'true');
+      hitPause = 0;
+      heartbeatAcc = 0;
+      cancelVibration();
+      updatePanicVisuals(0);
+      if (floatFxEl) floatFxEl.replaceChildren();
+      if (numberTipEl) {
+        if (numberTipTimer) window.clearTimeout(numberTipTimer);
+        numberTipEl.textContent = '';
+        numberTipEl.classList.remove('tip-dim');
+      }
+      syncHud();
+      aimPromoteActive = false;
+      aimPromoteElapsed = 0;
+      applyCupLayout();
+      syncDropQueuePreviews();
+      ghostPos.set(0, DROP_CENTER_Y, GHOST_Z);
+      const c = canvasCenterClient();
+      updateGhostAt(c.x, c.y);
+    }
+
+    overlayRestart.addEventListener('click', () => {
+      Sfx.resume();
+      fullReset();
+    });
+
+    function dropNext() {
+      if (gameOver) return;
+      const now = performance.now();
+      if (now - lastDropTime < DROP_COOLDOWN_MS) return;
+      lastDropTime = now;
+
+      const t = pendingDropType();
+      const strip1 = queuePreviewMeshes[1];
+      if (strip1) aimPromoteStart.copy(strip1.mesh.position);
+      else aimPromoteStart.copy(ghostPos);
+
+      const spec = FRUITS[t];
+      const c = clampDropXZ(ghostPos.x, ROW_Z, spec.radius);
+      spawnFruit(t, c.x, DROP_CENTER_Y, ROW_Z);
+      const last = fruits[fruits.length - 1];
+      last.body.velocity.set(0, -effectiveDropVy(), 0);
+      addScore(2);
+      Sfx.playDrop();
+      dropQueue.shift();
+      dropQueue.push(rollQueuedDropType());
+      syncDropQueuePreviews();
+      const aimAfter = queuePreviewMeshes[0];
+      if (aimAfter) aimAfter.mesh.position.copy(aimPromoteStart);
+      aimPromoteElapsed = 0;
+      aimPromoteActive = true;
+    }
+
+    renderer.domElement.addEventListener(
+      'pointermove',
+      (e) => {
+        updateGhostAt(e.clientX, e.clientY);
+      },
+      { passive: true },
+    );
+
+    renderer.domElement.addEventListener(
+      'pointerenter',
+      (e) => {
+        updateGhostAt(e.clientX, e.clientY);
+      },
+      { passive: true },
+    );
+
+    /** Touch: aim while finger down, drop on release. Mouse: same (press-drag-release). */
+    let aimPointerId = null;
+
+    canvasEl.addEventListener('pointerdown', (e) => {
+      if (gameOver) return;
+      if (e.button !== 0) return;
+      aimPointerId = e.pointerId;
+      try {
+        canvasEl.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      updateGhostAt(e.clientX, e.clientY);
+    });
+
+    function finishAimPointer(e, doDrop) {
+      if (aimPointerId === null || e.pointerId !== aimPointerId) return;
+      if (e.button !== 0 && e.type !== 'pointercancel') return;
+      aimPointerId = null;
+      try {
+        canvasEl.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      if (doDrop && !gameOver) {
+        updateGhostAt(e.clientX, e.clientY);
+        dropNext();
+      }
+    }
+
+    canvasEl.addEventListener('pointerup', (e) => {
+      finishAimPointer(e, true);
+    });
+
+    canvasEl.addEventListener('pointercancel', (e) => {
+      finishAimPointer(e, false);
+    });
+
+    function toggleBrowserFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'r' || e.key === 'R') fullReset();
+      if (e.key === 'f' || e.key === 'F') toggleBrowserFullscreen();
+      if (e.key === 'd' || e.key === 'D') {
+        if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          togglePhysDebugPanel();
+          e.preventDefault();
+        }
+      }
+    });
+
+    function onViewportChange() {
+      applyCupLayout();
+      const c = canvasCenterClient();
+      updateGhostAt(c.x, c.y);
+    }
+
+    window.addEventListener('resize', onViewportChange);
+    document.addEventListener('fullscreenchange', onViewportChange);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onViewportChange);
+      window.visualViewport.addEventListener('scroll', onViewportChange);
+    }
+
+    const clock = new THREE.Clock();
+    let acc = 0;
+    const fixed = 1 / 120;
+    const PHYS_SUBSTEPS = 2;
+
+    function tick() {
+      requestAnimationFrame(tick);
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      if (hitPause > 0) {
+        hitPause -= dt;
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (!gameOver) {
+        acc += dt;
+        while (acc >= fixed) {
+          const h = fixed / PHYS_SUBSTEPS;
+          for (let s = 0; s < PHYS_SUBSTEPS; s++) world.step(h);
+          acc -= fixed;
+        }
+      }
+      if (mergeCooldown > 0) mergeCooldown--;
+
+      queuePreviewGroup.visible = !gameOver;
+
+      for (const f of fruits) {
+        f.body.position.z = ROW_Z;
+        f.body.velocity.z = 0;
+        const r = FRUITS[f.type].radius;
+        const lim = innerHalfXForRadius(r);
+        const x = f.body.position.x;
+        if (x > lim) {
+          f.body.position.x = lim;
+          f.body.velocity.x *= -physicsTuning.wallVelRetain;
+        } else if (x < -lim) {
+          f.body.position.x = -lim;
+          f.body.velocity.x *= -physicsTuning.wallVelRetain;
+        }
+        f.mesh.position.copy(f.body.position);
+        updateLabelBillboard(f.label, camera);
+
+        if (f.fusionDur != null) {
+          f.fusionT += dt;
+          const u = Math.min(1, f.fusionT / f.fusionDur);
+          const sm = (x) => x * x * (3 - 2 * x);
+          let sx;
+          let sy;
+          let sz;
+          /** Squeeze → vertical bloom → settle to 1 */
+          if (u < 0.18) {
+            const t = sm(u / 0.18);
+            sx = 1 + 0.12 * t;
+            sy = 1 - 0.1 * t;
+            sz = 1 + 0.12 * t;
+          } else if (u < 0.42) {
+            const t = sm((u - 0.18) / 0.24);
+            sx = 1.12 - 0.36 * t;
+            sy = 0.9 + 0.5 * t;
+            sz = 1.12 - 0.36 * t;
+          } else if (u < 0.72) {
+            const t = sm((u - 0.42) / 0.3);
+            const bulge = Math.sin(t * Math.PI);
+            sx = 0.76 + 0.3 * t + 0.14 * bulge;
+            sy = 1.4 - 0.48 * t;
+            sz = 0.76 + 0.3 * t + 0.14 * bulge;
+          } else {
+            const t = sm((u - 0.72) / 0.28);
+            sx = 1 + 0.05 * (1 - t);
+            sy = 1 - 0.04 * (1 - t);
+            sz = 1 + 0.05 * (1 - t);
+          }
+          f.ball.scale.set(sx, sy, sz);
+          const m = f.ball.material;
+          const baseE = fruitIdleEmissiveIntensity(f.type);
+          if (m && typeof m.emissiveIntensity === 'number') {
+            const w = Math.sin(Math.PI * Math.min(1, u * 1.35)) * (1 - 0.35 * u);
+            m.emissiveIntensity = baseE + 0.58 * w;
+          }
+          if (u >= 1) {
+            f.ball.scale.set(1, 1, 1);
+            if (m && typeof m.emissiveIntensity === 'number') m.emissiveIntensity = baseE;
+            delete f.fusionT;
+            delete f.fusionDur;
+          }
+        }
+      }
+
+      updateJackpotVanishes(dt);
+
+      for (const q of queuePreviewMeshes) {
+        if (q?.label) updateLabelBillboard(q.label, camera);
+      }
+
+      const aimLerp = queuePreviewMeshes[0];
+      if (aimPromoteActive && aimLerp) {
+        aimPromoteElapsed += dt;
+        const u = Math.min(1, aimPromoteElapsed / AIM_PROMOTE_SEC);
+        const ease = 1 - (1 - u) ** 2;
+        aimLerp.mesh.position.lerpVectors(aimPromoteStart, ghostPos, ease);
+        if (u >= 1) aimPromoteActive = false;
+      }
+
+      layoutQueuePreviewMeshes();
+
+      tryMerge();
+      checkGameOver(dt);
+
+      tensionTime += dt;
+      const pileStress = juice.computePileStress(fruits, FRUITS, GAME_OVER_Y, DANGER_PULSE_BAND);
+      juice.updateDangerLine(dangerLine, pileStress, tensionTime);
+      updatePanicVisuals(pileStress);
+      if (pileStress > 0.32) {
+        heartbeatAcc += dt;
+        const beatInt = 1.05 - pileStress * 0.62;
+        if (heartbeatAcc >= beatInt) {
+          heartbeatAcc = 0;
+          Sfx.playHeartbeat(pileStress);
+        }
+      } else {
+        heartbeatAcc = 0;
+      }
+      juice.updateParticles(dt);
+      updateCameraFrustum();
+      camera.position.set(0, orthoLayout.orthoMidY, 20);
+
+      renderer.render(scene, camera);
+    }
+
+    initPhysicsDebugUI(physicsTuning, applyPhysicsTuning, applyPhysicsPreset);
+
+    syncHud();
+    applyCupLayout();
+    syncDropQueuePreviews();
+    const c0 = canvasCenterClient();
+    updateGhostAt(c0.x, c0.y);
+
+    tick();
+  </script>
+</body>
+</html>

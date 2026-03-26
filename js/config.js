@@ -5,13 +5,8 @@ export const QUEUE_STRIP_SCALE = 0.52;
 export const QUEUE_STRIP_LANE = 0.09;
 export const QUEUE_TOP_BAND = 0.38;
 
-export const FRUIT_DENSITY = 12600;
-
-/** kg/m³ scale — mass = density × sphere volume (consistent with radius). */
-export function fruitMassForRadius(r) {
-  const volume = (4 / 3) * Math.PI * r ** 3;
-  return FRUIT_DENSITY * volume;
-}
+/** @deprecated import from ./ball-mass.js */
+export { FRUIT_DENSITY, fruitMassForRadius } from './ball-mass.js';
 
 /** Merge only when circle distance ≤ (r1+r2) × mult — lower = must touch more (less “vacuum merge”). */
 export const MERGE_DIST_MULT = 1.045;

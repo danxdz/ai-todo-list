@@ -292,7 +292,7 @@ export function createTryMerge(ctx, flavor) {
         ctx.removeFruit(b);
         ctx.spawnFruit(newType, cx, nySpawn, ctx.ROW_Z, { fusionPop: true });
         const merged = ctx.getFruits()[ctx.getFruits().length - 1];
-        const cap = 4.2;
+        const cap = 3.0;
         const sp = Math.hypot(mvx, mvy);
         if (sp > cap) {
           const k = cap / sp;
@@ -301,7 +301,7 @@ export function createTryMerge(ctx, flavor) {
         }
         merged.body.velocity.set(mvx, mvy, 0);
         merged.body.angularVelocity.set(0, 0, 0);
-        dampMergeNeighbors(ctx, nx, ny, merged, Math.max(ra, rb) * 2.85, 0.52);
+        dampMergeNeighbors(ctx, nx, ny, merged, Math.max(ra, rb) * 3.2, 0.38);
         ctx.addScore(mergePts, { skipScorePulse: true });
         onNormalMergeUi(mergePts, newType, nx, ny, ctx.FRUITS[newType]);
         ctx.flashHudMerge(ctx.scoreEl);

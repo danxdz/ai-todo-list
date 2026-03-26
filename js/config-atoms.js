@@ -8,12 +8,7 @@ export const QUEUE_STRIP_SCALE = 0.52;
 export const QUEUE_STRIP_LANE = 0.09;
 export const QUEUE_TOP_BAND = 0.38;
 
-export const FRUIT_DENSITY = 12600;
-
-export function fruitMassForRadius(r) {
-  const volume = (4 / 3) * Math.PI * r ** 3;
-  return FRUIT_DENSITY * volume;
-}
+export { FRUIT_DENSITY, fruitMassForRadius } from './ball-mass.js';
 
 export const MERGE_DIST_MULT = 1.045;
 export const JACKPOT_MERGE_DIST_MULT = 1.12;

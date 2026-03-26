@@ -416,7 +416,6 @@
       QUEUE_STRIP_SCALE,
       QUEUE_STRIP_LANE,
       QUEUE_TOP_BAND,
-      fruitMassForRadius,
       FRUITS,
       MERGE_POINTS,
       MERGEABLE_TYPE_MAX,
@@ -452,6 +451,7 @@
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
     import { createPlayfieldCup } from './js/playfield-cup.js';
     import { createTryMerge } from './js/merge-engine.js';
+    import { massForFruitSpec } from './js/ball-mass.js';
     import { t } from './js/i18n.js';
     import { initMergeGameShell } from './js/ui-shell.js';
 
@@ -1007,7 +1007,7 @@
       scene.add(mesh);
 
       const shape = new CANNON.Sphere(r);
-      const mass = fruitMassForRadius(r);
+      const mass = massForFruitSpec(spec);
       const body = new CANNON.Body({
         mass,
         linearDamping: physicsTuning.linearDamping,

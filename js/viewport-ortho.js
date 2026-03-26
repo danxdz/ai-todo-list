@@ -1,12 +1,11 @@
 /**
- * Shared orthographic viewport + canvas sizing for merge demos.
- * Keeps visualViewport/fullscreen quirks and letterboxed ortho frustum in one place.
+ * Shared viewport + canvas sizing for merge demos (OrthographicCamera or PerspectiveCamera).
  */
 
 /**
  * @param {object} opts
  * @param {import('three').WebGLRenderer} opts.renderer
- * @param {import('three').OrthographicCamera} opts.camera
+ * @param {import('three').Camera} opts.camera
  * @param {HTMLCanvasElement} opts.canvasEl
  */
 export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
@@ -16,6 +15,8 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
     orthoBaseHalfW: 3.5,
     orthoBaseHalfSpanY: 6,
     orthoMidY: 5,
+    /** Vertical FOV (deg) for PerspectiveCamera — tuned from cup half-height */
+    perspectiveFov: 42,
   };
 
   /** Space for fixed bottom HUD so the WebGL canvas does not draw under it */
@@ -62,6 +63,12 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
     const spanY = state.orthoBaseHalfSpanY;
     const w = Math.max(1, renderer.domElement.width);
     const h = Math.max(1, renderer.domElement.height);
+    if (camera.isPerspectiveCamera) {
+      camera.aspect = w / h;
+      camera.fov = state.perspectiveFov;
+      camera.updateProjectionMatrix();
+      return;
+    }
     const va = w / h;
     const ca = halfW / spanY;
     let aw;
@@ -96,6 +103,9 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
 
   /** Vertical half-extent of ortho frustum in world Y (matches syncCanvasToViewport). */
   function getOrthoAhHalf() {
+    if (camera.isPerspectiveCamera) {
+      return state.orthoBaseHalfSpanY;
+    }
     const w = Math.max(1, renderer.domElement.width);
     const h = Math.max(1, renderer.domElement.height);
     const va = w / h;
@@ -119,6 +129,10 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
     state.orthoBaseHalfW = halfW;
     state.orthoBaseHalfSpanY = halfSpanY;
     state.orthoMidY = midY;
+    /** Match ~distance from camera to cup center in applyMergeOrthoCameraPose (~18.5) */
+    const camDist = 18.5;
+    const fovRad = 2 * Math.atan((halfSpanY * 1.12) / camDist);
+    state.perspectiveFov = Math.min(50, Math.max(32, (fovRad * 180) / Math.PI));
   }
 
   return {

@@ -41,7 +41,8 @@ export function attachSceneBackground(scene) {
 }
 
 export function createRendererAndCamera(container = document.body) {
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 80);
+  /** Perspective default — real depth cues; frustum updated in viewport-ortho */
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.2, 120);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setClearColor(0x1a2438, 1);

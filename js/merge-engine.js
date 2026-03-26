@@ -301,7 +301,7 @@ export function createTryMerge(ctx, flavor) {
         }
         merged.body.velocity.set(mvx, mvy, 0);
         merged.body.angularVelocity.set(0, 0, 0);
-        dampMergeNeighbors(ctx, nx, ny, merged, Math.max(ra, rb) * 3.2, 0.38);
+        dampMergeNeighbors(ctx, nx, ny, merged, Math.max(ra, rb) * 2.85, 0.26);
         ctx.addScore(mergePts, { skipScorePulse: true });
         onNormalMergeUi(mergePts, newType, nx, ny, ctx.FRUITS[newType]);
         ctx.flashHudMerge(ctx.scoreEl);

@@ -4,8 +4,8 @@
  * relative atomic weights (H = 1.0) on top of sphere volume.
  */
 
-/** Was 12600 — raised so piles feel heavier and calmer */
-export const FRUIT_DENSITY = 32000;
+/** Raised for heavy marble-like piles */
+export const FRUIT_DENSITY = 38000;
 
 /** Standard atomic weights (u), Z = 1 … 18 (H–Ar) — CRC-ish rounded */
 const ATOMIC_WEIGHT_U = {

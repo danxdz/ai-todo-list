@@ -2,25 +2,25 @@ import * as CANNON from 'cannon-es';
 
 /** Baseline — heavy, low bounce (not ping-pong) */
 const CERAMIC_VALUES = {
-  gravity: 42,
-  restitutionFruit: 0.14,
-  restitutionDefault: 0.018,
-  frictionFruit: 0.76,
-  frictionDefault: 0.72,
-  linearDamping: 0.12,
+  gravity: 48,
+  restitutionFruit: 0.09,
+  restitutionDefault: 0.012,
+  frictionFruit: 0.84,
+  frictionDefault: 0.82,
+  linearDamping: 0.14,
   /** Lower = visible roll on pile (sprites still billboard in atoms) */
-  angularDamping: 0.26,
+  angularDamping: 0.32,
   sleepSpeedLimit: 0.18,
   sleepTimeLimit: 0.22,
   wallVelRetain: 0.003,
   /** Lower = calmer merges, less chain-reaction knockback */
-  mergeVelScale: 0.035,
+  mergeVelScale: 0.028,
   mergeAngScale: 0.02,
   dropVy: 0.2,
   /** Stiffer contacts = less visual overlap / sinking into neighbors */
-  contactStiffness6: 228,
-  contactRelaxation: 3.15,
-  solverIterations: 52,
+  contactStiffness6: 248,
+  contactRelaxation: 2.85,
+  solverIterations: 56,
   frictionEqStiffness7: 6.8,
   frictionEqRelaxation: 1.95,
 };
@@ -32,21 +32,21 @@ export const PHYSICS_PRESETS = {
   /** Strong gravity, snappy contacts, less bounce — “dense” pile */
   heavy: {
     ...CERAMIC_VALUES,
-    gravity: 54,
-    restitutionFruit: 0.11,
-    restitutionDefault: 0.014,
-    frictionFruit: 0.8,
-    frictionDefault: 0.8,
-    linearDamping: 0.13,
-    angularDamping: 0.28,
+    gravity: 58,
+    restitutionFruit: 0.075,
+    restitutionDefault: 0.01,
+    frictionFruit: 0.88,
+    frictionDefault: 0.86,
+    linearDamping: 0.15,
+    angularDamping: 0.34,
     sleepSpeedLimit: 0.14,
     sleepTimeLimit: 0.28,
     wallVelRetain: 0.002,
-    mergeVelScale: 0.028,
+    mergeVelScale: 0.024,
     dropVy: 0.28,
-    contactStiffness6: 238,
-    contactRelaxation: 2.95,
-    solverIterations: 56,
+    contactStiffness6: 268,
+    contactRelaxation: 2.55,
+    solverIterations: 58,
     frictionEqStiffness7: 7.4,
     frictionEqRelaxation: 1.72,
   },
@@ -131,7 +131,7 @@ export function createPhysicsWorld() {
  */
 export function nudgeSpawnSpin(body) {
   if (!body?.angularVelocity) return;
-  const s = 5.5;
+  const s = 2.2;
   body.angularVelocity.set(
     (Math.random() - 0.5) * s,
     (Math.random() - 0.5) * s * 0.6,

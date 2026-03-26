@@ -8,14 +8,20 @@ import * as CANNON from 'cannon-es';
 /** @typedef {'marble' | 'numbers' | 'atoms'} PlayfieldThemeId */
 
 /**
- * Orthographic camera: slight low tilt so the cup reads more 3D than pure front-on.
- * @param {import('three').OrthographicCamera} camera
- * @param {number} midY — matches orthoLayout.orthoMidY from fitCameraToCup
+ * Slight low tilt + (for perspective) mild side offset so the cup reads clearly in 3D.
+ * @param {import('three').Camera} camera
+ * @param {number} midY — matches layout orthoMidY from fitCameraToCup
  */
 export function applyMergeOrthoCameraPose(camera, midY) {
   const camTiltY = 1.35;
   const lookYFocus = midY + 0.28;
-  camera.position.set(0, midY - camTiltY, 20.2);
+  if (camera.isPerspectiveCamera) {
+    const dist = 18.2;
+    const lateral = 0.95;
+    camera.position.set(lateral, midY - camTiltY + 0.35, dist);
+  } else {
+    camera.position.set(0, midY - camTiltY, 20.2);
+  }
   camera.up.set(0, 1, 0);
   camera.lookAt(0, lookYFocus, 0);
 }

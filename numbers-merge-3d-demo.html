@@ -505,6 +505,7 @@
       createNumberDigitSprite,
       updateLabelBillboard,
       setNumberLabelScale,
+      placeDigitInFrontOfSphere,
     } from './js/ball-label-sprite.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
@@ -772,7 +773,7 @@
       ball.receiveShadow = true;
       const label = createNumberDigitSprite(spec);
       setNumberLabelScale(label, r);
-      label.position.z = r * 0.92;
+      placeDigitInFrontOfSphere(label, r);
       const group = new THREE.Group();
       group.add(ball);
       group.add(label);

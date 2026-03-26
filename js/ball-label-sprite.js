@@ -37,12 +37,12 @@ export function createElementSymbolSprite(spec) {
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
-    depthTest: true,
+    depthTest: false,
     depthWrite: false,
   });
   const spr = new THREE.Sprite(mat);
   spr.scale.setScalar(1);
-  spr.renderOrder = 20;
+  spr.renderOrder = 999;
   return spr;
 }
 
@@ -51,10 +51,10 @@ export function createNumberDigitSprite(spec) {
   const tex = makeCanvasTexture((ctx, s) => {
     ctx.clearRect(0, 0, s, s);
     const numStr = String(spec.number);
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = s * 0.07;
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = s * 0.08;
     ctx.fillStyle = '#ffffff';
-    const numSize = numStr.length >= 2 ? s * 0.34 : s * 0.42;
+    const numSize = numStr.length >= 2 ? s * 0.36 : s * 0.44;
     ctx.font = `900 ${numSize}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -64,12 +64,12 @@ export function createNumberDigitSprite(spec) {
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
-    depthTest: true,
+    depthTest: false,
     depthWrite: false,
   });
   const spr = new THREE.Sprite(mat);
   spr.scale.setScalar(1);
-  spr.renderOrder = 20;
+  spr.renderOrder = 999;
   return spr;
 }
 
@@ -85,6 +85,11 @@ export function setElementLabelScale(sprite, radius) {
 }
 
 export function setNumberLabelScale(sprite, radius) {
-  const w = radius * 1.45;
+  const w = radius * 1.62;
   sprite.scale.set(w, w, w);
+}
+
+/** Push digit slightly in front of sphere toward camera (+Z in local space; camera looks from +Z). */
+export function placeDigitInFrontOfSphere(label, radius) {
+  label.position.set(0, 0, radius * 1.06);
 }

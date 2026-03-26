@@ -788,6 +788,7 @@
       createElementSymbolSprite,
       updateLabelBillboard,
       setElementLabelScale,
+      placeDigitInFrontOfSphere,
     } from './js/ball-label-sprite.js';
     import {
       touchDiscoveredAtomicNumber,
@@ -1383,7 +1384,7 @@
       ball.receiveShadow = true;
       const label = createElementSymbolSprite(spec);
       setElementLabelScale(label, r);
-      label.position.z = r * 0.92;
+      placeDigitInFrontOfSphere(label, r);
       const group = new THREE.Group();
       group.add(ball);
       group.add(label);
@@ -1675,6 +1676,7 @@
       },
       {
         mergeResult: 'nextTier',
+        vfxHeavy: true,
         jackpotFloatTier: (jpPts) => `FUSION +${jpPts}`,
         onJackpotTierExtra: () =>
           showAtomFact('Fusion breakthrough — twin heaviest nuclei cleared the reactor column.'),

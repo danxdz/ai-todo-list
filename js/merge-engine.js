@@ -44,6 +44,7 @@ import { scoreWithMultiplier } from './gameplay.js';
  * @param {(jpPts: number) => string} [flavor.jackpotFloatTwinTen]
  * @param {() => void} [flavor.onJackpotTwinTenExtra]
  * @param {(mergePts: number, newType: number, nx: number, ny: number, spec: object) => void} flavor.onNormalMergeUi
+ * @param {boolean} [flavor.vfxHeavy] — extra smoke / shatter (atoms theme)
  */
 export function createTryMerge(ctx, flavor) {
   const {
@@ -55,6 +56,7 @@ export function createTryMerge(ctx, flavor) {
     jackpotFloatTwinTen,
     onJackpotTwinTenExtra,
     onNormalMergeUi,
+    vfxHeavy = false,
   } = flavor;
 
   return function tryMerge() {
@@ -87,6 +89,8 @@ export function createTryMerge(ctx, flavor) {
         const jpPts = scoreWithMultiplier(JACKPOT_MERGE_PTS, jm);
         ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, jBurst, jBoost, 'jackpot');
         ctx.juice.burstSparks(jx, jy, ctx.ROW_Z + 0.05, ctx.FRUITS[MAX_TYPE].color, 28);
+        ctx.juice.smokePuff?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, vfxHeavy ? 38 : 26);
+        ctx.juice.shatterSpray?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[MAX_TYPE].color, vfxHeavy ? 28 : 18);
         ctx.queueHitPause(0.088);
         ctx.beginJackpotVanish(a);
         ctx.beginJackpotVanish(b);
@@ -132,6 +136,8 @@ export function createTryMerge(ctx, flavor) {
           const jpPts = scoreWithMultiplier(TEN_JP_PTS, jm);
           ctx.juice.burst(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, jBurst, jBoost, 'jackpot');
           ctx.juice.burstSparks(jx, jy, ctx.ROW_Z + 0.05, ctx.FRUITS[twinTenType].color, 24);
+          ctx.juice.smokePuff?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, vfxHeavy ? 34 : 24);
+          ctx.juice.shatterSpray?.(jx, jy, ctx.ROW_Z + 0.02, ctx.FRUITS[twinTenType].color, vfxHeavy ? 24 : 16);
           ctx.queueHitPause(0.08);
           ctx.beginJackpotVanish(a);
           ctx.beginJackpotVanish(b);
@@ -212,6 +218,10 @@ export function createTryMerge(ctx, flavor) {
           ctx.FRUITS[a.type].color,
           Math.min(26, 12 + Math.floor(pCount * 0.22)),
         );
+        const smCount = Math.min(32, 14 + Math.floor(chainSnap * 6) + Math.floor((mult - 1) * 4));
+        const shCount = Math.min(22, 10 + Math.floor(chainSnap * 4) + Math.floor((mult - 1) * 3));
+        ctx.juice.smokePuff?.(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, vfxHeavy ? smCount + 10 : smCount);
+        ctx.juice.shatterSpray?.(nx, ny, ctx.ROW_Z + 0.02, ctx.FRUITS[a.type].color, vfxHeavy ? shCount + 6 : shCount);
         ctx.queueHitPause(0.052);
 
         ctx.removeFruit(a);

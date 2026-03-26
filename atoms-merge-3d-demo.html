@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>Periodic Stack — Atomic merge v62</title>
+  <title>Periodic Stack — Atomic merge v63</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -614,7 +614,7 @@
   <div id="floatFx" aria-hidden="true"></div>
   <div id="hud">
     <div class="hud-column">
-      <div class="hud-brand">Periodic Stack <strong id="buildId">v62</strong></div>
+      <div class="hud-brand">Periodic Stack <strong id="buildId">v63</strong></div>
       <div class="hud-stat">
         <span class="hud-label">Score</span>
         <span class="hud-value" id="scoreVal">0</span>
@@ -783,6 +783,12 @@
     } from './js/config-atoms.js';
     import { drawElementFace2d } from './js/atoms-element-face.js';
     import { drawAtomShells2d } from './js/atom-shells.js';
+    import { getAtomBallStyle } from './js/atom-ball-style.js';
+    import {
+      createElementSymbolSprite,
+      updateLabelBillboard,
+      setElementLabelScale,
+    } from './js/ball-label-sprite.js';
     import {
       touchDiscoveredAtomicNumber,
       discoveredCount,
@@ -802,6 +808,7 @@
     import { scoreWithMultiplier } from './js/gameplay.js';
     import { vibrateMerge, vibrateJackpot, cancelVibration } from './js/haptics.js';
     import { applyStudioEnvironment } from './js/environment.js';
+    import { createOrthoViewportLayout } from './js/viewport-ortho.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
     /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
@@ -1235,95 +1242,15 @@
     const { sun: keyLight } = addDefaultLights(scene);
     applyStudioEnvironment(renderer, scene);
 
-    function getViewportSize() {
-      const iw = window.innerWidth;
-      const ih = window.innerHeight;
-      /** Fullscreen + several desktop browsers report bad visualViewport offsets/heights → canvas shifts down and clips */
-      if (document.fullscreenElement) {
-        return { width: iw, height: ih, offsetLeft: 0, offsetTop: 0 };
-      }
-      const vv = window.visualViewport;
-      if (vv && vv.width > 0 && vv.height > 0) {
-        let w = vv.width;
-        let h = vv.height;
-        let ox = vv.offsetLeft;
-        let oy = vv.offsetTop;
-        const coarse = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
-        const vvLooksBroken =
-          !coarse &&
-          (Math.abs(oy) > ih * 0.2 ||
-            Math.abs(ox) > iw * 0.2 ||
-            h < ih * 0.75 ||
-            w < iw * 0.75);
-        if (vvLooksBroken) {
-          w = iw;
-          h = ih;
-          ox = 0;
-          oy = 0;
-        }
-        return { width: w, height: h, offsetLeft: ox, offsetTop: oy };
-      }
-      return { width: iw, height: ih, offsetLeft: 0, offsetTop: 0 };
-    }
-
-    /** Content ortho half-extents (before letterboxing to viewport aspect) */
-    let layoutWorldHalfW = 3.5;
-    let layoutWorldViewH = 12;
-    let orthoBaseHalfW = 3.5;
-    let orthoBaseHalfSpanY = 6;
-    let orthoMidY = 5;
-
-    function updateCameraFrustum() {
-      const halfW = orthoBaseHalfW;
-      const spanY = orthoBaseHalfSpanY;
-      const w = Math.max(1, renderer.domElement.width);
-      const h = Math.max(1, renderer.domElement.height);
-      const va = w / h;
-      const ca = halfW / spanY;
-      let aw;
-      let ahHalf;
-      if (va > ca) {
-        ahHalf = spanY;
-        aw = ahHalf * va;
-      } else {
-        aw = halfW;
-        ahHalf = aw / va;
-      }
-      camera.left = -aw;
-      camera.right = aw;
-      camera.bottom = -ahHalf;
-      camera.top = ahHalf;
-      camera.updateProjectionMatrix();
-    }
-
-    function syncCanvasToViewport() {
-      const { width: vpW, height: vpH, offsetLeft, offsetTop } = getViewportSize();
-      const w = Math.max(1, Math.floor(vpW));
-      const h = Math.max(1, Math.floor(vpH));
-      renderer.setSize(w, h, false);
-      canvasEl.style.position = 'fixed';
-      canvasEl.style.left = `${offsetLeft}px`;
-      canvasEl.style.top = `${offsetTop}px`;
-      canvasEl.style.width = `${w}px`;
-      canvasEl.style.height = `${h}px`;
-      updateCameraFrustum();
-      return { width: w, height: h };
-    }
-
-    /** Vertical half-extent of ortho frustum in world Y (matches syncCanvasToViewport). */
-    function getOrthoAhHalf() {
-      const w = Math.max(1, renderer.domElement.width);
-      const h = Math.max(1, renderer.domElement.height);
-      const va = w / h;
-      const ca = orthoBaseHalfW / orthoBaseHalfSpanY;
-      if (va > ca) return orthoBaseHalfSpanY;
-      return orthoBaseHalfW / va;
-    }
-
-    function canvasCenterClient() {
-      const r = canvasEl.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }
+    const {
+      state: orthoLayout,
+      getViewportSize,
+      updateCameraFrustum,
+      syncCanvasToViewport,
+      getOrthoAhHalf,
+      canvasCenterClient,
+      applyCupOrthoFrame,
+    } = createOrthoViewportLayout({ renderer, camera, canvasEl });
 
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
@@ -1378,19 +1305,6 @@
       ctx.beginPath();
       ctx.arc(s / 2, s / 2, s * 0.38, 0, Math.PI * 2);
       ctx.stroke();
-      const sym = spec.symbol || '?';
-      const fs = sym.length > 2 ? 72 : 108;
-      ctx.shadowColor = 'rgba(0,0,0,0.55)';
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.font = `800 ${fs}px system-ui, "Segoe UI", sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(sym, s / 2, s / 2 - 6);
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(255,255,255,0.52)';
-      ctx.font = '600 16px system-ui, sans-serif';
-      ctx.fillText(spec.name || '', s / 2, s * 0.78);
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
       elementFaceTextures[type] = tex;
@@ -1406,56 +1320,73 @@
       return 0.02 + tNorm * 0.025;
     }
 
-    /** Element sphere: symbol + name on map; ghost = queue preview */
+    /** Sphere skin (gradient + shells) — symbol is a billboard sprite, not UV text */
     function makeFruitMaterial(type, { ghost = false } = {}) {
       initFruitVisuals();
       const spec = FRUITS[type];
       const tNorm = FRUITS.length > 1 ? type / (FRUITS.length - 1) : 0;
       const { roughnessMap } = fruitSharedTextures;
       const faceMap = elementFaceMap(type);
+      const st = getAtomBallStyle(type, spec);
 
       if (ghost) {
         return new THREE.MeshPhysicalMaterial({
-          color: 0xffffff,
+          color: st.color,
           map: faceMap,
           roughnessMap,
-          roughness: 0.18,
-          metalness: 0,
-          transmission: 0.72,
-          thickness: 0.95,
-          ior: 1.5,
-          specularIntensity: 0.85,
+          roughness: Math.min(0.22, st.roughness * 0.85),
+          metalness: st.metalness * 0.5,
+          transmission: Math.min(0.82, st.transmission + 0.08),
+          thickness: st.thickness,
+          ior: st.ior,
+          specularIntensity: 0.9,
           specularColor: new THREE.Color(0xffffff),
-          clearcoat: 0.28,
-          clearcoatRoughness: 0.14,
-          emissive: spec.color,
-          emissiveIntensity: 0.12 + tNorm * 0.06,
-          envMapIntensity: 1.15,
+          clearcoat: st.clearcoat,
+          clearcoatRoughness: st.clearcoatRoughness,
+          emissive: st.emissive,
+          emissiveIntensity: (st.emissiveIntensity ?? 0.04) + tNorm * 0.04,
+          envMapIntensity: st.envMapIntensity,
           transparent: true,
           depthWrite: true,
         });
       }
 
       return new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
+        color: st.color,
         map: faceMap,
         roughnessMap,
-        roughness: 0.26,
-        metalness: 0,
-        transmission: 0.14 + tNorm * 0.1,
-        thickness: 0.55 + tNorm * 0.35,
-        ior: 1.54,
+        roughness: st.roughness,
+        metalness: st.metalness,
+        transmission: st.transmission,
+        thickness: st.thickness,
+        ior: st.ior,
         specularIntensity: 1,
         specularColor: new THREE.Color(0xffffff),
-        clearcoat: 0.42,
-        clearcoatRoughness: 0.12,
-        attenuationColor: spec.color,
-        attenuationDistance: 0.55 + tNorm * 0.45,
-        emissive: 0x0a1210,
-        emissiveIntensity: fruitIdleEmissiveIntensity(type),
-        envMapIntensity: 1.05,
+        clearcoat: st.clearcoat,
+        clearcoatRoughness: st.clearcoatRoughness,
+        attenuationColor: st.color,
+        attenuationDistance: 0.45 + tNorm * 0.55,
+        emissive: st.emissive,
+        emissiveIntensity: Math.max(fruitIdleEmissiveIntensity(type), st.emissiveIntensity ?? 0),
+        envMapIntensity: st.envMapIntensity,
         depthWrite: true,
       });
+    }
+
+    function buildBallGroup(type, r, { ghost = false } = {}) {
+      const spec = FRUITS[type];
+      const geo = new THREE.SphereGeometry(r, 32, 24);
+      const mat = makeFruitMaterial(type, { ghost });
+      const ball = new THREE.Mesh(geo, mat);
+      ball.castShadow = !ghost;
+      ball.receiveShadow = true;
+      const label = createElementSymbolSprite(spec);
+      setElementLabelScale(label, r);
+      label.position.z = r * 0.92;
+      const group = new THREE.Group();
+      group.add(ball);
+      group.add(label);
+      return { group, ball, label };
     }
 
     initFruitVisuals();
@@ -1748,11 +1679,7 @@
       const midY = (lowWorld + highWorld) / 2;
       /** Ortho left/right/top/bottom are in camera space. With camera at y=midY, world y maps to y_cam ≈ y_world − midY — not absolute world y. */
       const halfSpanY = (highWorld - lowWorld) / 2;
-      layoutWorldHalfW = halfW;
-      layoutWorldViewH = highWorld - lowWorld;
-      orthoBaseHalfW = halfW;
-      orthoBaseHalfSpanY = halfSpanY;
-      orthoMidY = midY;
+      applyCupOrthoFrame({ halfW, halfSpanY, midY });
 
       camera.position.set(0, midY, 20);
       camera.up.set(0, 1, 0);
@@ -1889,7 +1816,7 @@
       const innerL = -(CUP.halfX - CUP.wallT);
       const inset = 0.06;
       const zq = GHOST_Z;
-      const yTop = orthoMidY + getOrthoAhHalf();
+      const yTop = orthoLayout.orthoMidY + getOrthoAhHalf();
       let rMax = 0.18;
       for (let i = 1; i < 4; i++) {
         const e = queuePreviewMeshes[i];
@@ -2309,7 +2236,7 @@
       if (discoveryOpen && !gameOver) {
         juice.updateParticles(dt);
         updateCameraFrustum();
-        camera.position.set(0, orthoMidY, 20);
+        camera.position.set(0, orthoLayout.orthoMidY, 20);
         renderer.render(scene, camera);
         return;
       }
@@ -2420,7 +2347,7 @@
       }
       juice.updateParticles(dt);
       updateCameraFrustum();
-      camera.position.set(0, orthoMidY, 20);
+      camera.position.set(0, orthoLayout.orthoMidY, 20);
 
       renderer.render(scene, camera);
     }

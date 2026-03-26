@@ -487,6 +487,7 @@
     import { scoreWithMultiplier } from './js/gameplay.js';
     import { vibrateMerge, vibrateJackpot, cancelVibration } from './js/haptics.js';
     import { applyStudioEnvironment } from './js/environment.js';
+    import { createOrthoViewportLayout } from './js/viewport-ortho.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
     /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
@@ -668,95 +669,15 @@
     const { sun: keyLight } = addDefaultLights(scene);
     applyStudioEnvironment(renderer, scene);
 
-    function getViewportSize() {
-      const iw = window.innerWidth;
-      const ih = window.innerHeight;
-      /** Fullscreen + several desktop browsers report bad visualViewport offsets/heights → canvas shifts down and clips */
-      if (document.fullscreenElement) {
-        return { width: iw, height: ih, offsetLeft: 0, offsetTop: 0 };
-      }
-      const vv = window.visualViewport;
-      if (vv && vv.width > 0 && vv.height > 0) {
-        let w = vv.width;
-        let h = vv.height;
-        let ox = vv.offsetLeft;
-        let oy = vv.offsetTop;
-        const coarse = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
-        const vvLooksBroken =
-          !coarse &&
-          (Math.abs(oy) > ih * 0.2 ||
-            Math.abs(ox) > iw * 0.2 ||
-            h < ih * 0.75 ||
-            w < iw * 0.75);
-        if (vvLooksBroken) {
-          w = iw;
-          h = ih;
-          ox = 0;
-          oy = 0;
-        }
-        return { width: w, height: h, offsetLeft: ox, offsetTop: oy };
-      }
-      return { width: iw, height: ih, offsetLeft: 0, offsetTop: 0 };
-    }
-
-    /** Content ortho half-extents (before letterboxing to viewport aspect) */
-    let layoutWorldHalfW = 3.5;
-    let layoutWorldViewH = 12;
-    let orthoBaseHalfW = 3.5;
-    let orthoBaseHalfSpanY = 6;
-    let orthoMidY = 5;
-
-    function updateCameraFrustum() {
-      const halfW = orthoBaseHalfW;
-      const spanY = orthoBaseHalfSpanY;
-      const w = Math.max(1, renderer.domElement.width);
-      const h = Math.max(1, renderer.domElement.height);
-      const va = w / h;
-      const ca = halfW / spanY;
-      let aw;
-      let ahHalf;
-      if (va > ca) {
-        ahHalf = spanY;
-        aw = ahHalf * va;
-      } else {
-        aw = halfW;
-        ahHalf = aw / va;
-      }
-      camera.left = -aw;
-      camera.right = aw;
-      camera.bottom = -ahHalf;
-      camera.top = ahHalf;
-      camera.updateProjectionMatrix();
-    }
-
-    function syncCanvasToViewport() {
-      const { width: vpW, height: vpH, offsetLeft, offsetTop } = getViewportSize();
-      const w = Math.max(1, Math.floor(vpW));
-      const h = Math.max(1, Math.floor(vpH));
-      renderer.setSize(w, h, false);
-      canvasEl.style.position = 'fixed';
-      canvasEl.style.left = `${offsetLeft}px`;
-      canvasEl.style.top = `${offsetTop}px`;
-      canvasEl.style.width = `${w}px`;
-      canvasEl.style.height = `${h}px`;
-      updateCameraFrustum();
-      return { width: w, height: h };
-    }
-
-    /** Vertical half-extent of ortho frustum in world Y (matches syncCanvasToViewport). */
-    function getOrthoAhHalf() {
-      const w = Math.max(1, renderer.domElement.width);
-      const h = Math.max(1, renderer.domElement.height);
-      const va = w / h;
-      const ca = orthoBaseHalfW / orthoBaseHalfSpanY;
-      if (va > ca) return orthoBaseHalfSpanY;
-      return orthoBaseHalfW / va;
-    }
-
-    function canvasCenterClient() {
-      const r = canvasEl.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }
+    const {
+      state: orthoLayout,
+      getViewportSize,
+      updateCameraFrustum,
+      syncCanvasToViewport,
+      getOrthoAhHalf,
+      canvasCenterClient,
+      applyCupOrthoFrame,
+    } = createOrthoViewportLayout({ renderer, camera, canvasEl });
 
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
@@ -1194,11 +1115,7 @@
       const midY = (lowWorld + highWorld) / 2;
       /** Ortho left/right/top/bottom are in camera space. With camera at y=midY, world y maps to y_cam ≈ y_world − midY — not absolute world y. */
       const halfSpanY = (highWorld - lowWorld) / 2;
-      layoutWorldHalfW = halfW;
-      layoutWorldViewH = highWorld - lowWorld;
-      orthoBaseHalfW = halfW;
-      orthoBaseHalfSpanY = halfSpanY;
-      orthoMidY = midY;
+      applyCupOrthoFrame({ halfW, halfSpanY, midY });
 
       camera.position.set(0, midY, 20);
       camera.up.set(0, 1, 0);
@@ -1335,7 +1252,7 @@
       const innerL = -(CUP.halfX - CUP.wallT);
       const inset = 0.06;
       const zq = GHOST_Z;
-      const yTop = orthoMidY + getOrthoAhHalf();
+      const yTop = orthoLayout.orthoMidY + getOrthoAhHalf();
       let rMax = 0.18;
       for (let i = 1; i < 4; i++) {
         const e = queuePreviewMeshes[i];
@@ -1840,7 +1757,7 @@
       }
       juice.updateParticles(dt);
       updateCameraFrustum();
-      camera.position.set(0, orthoMidY, 20);
+      camera.position.set(0, orthoLayout.orthoMidY, 20);
 
       renderer.render(scene, camera);
     }

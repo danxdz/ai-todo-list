@@ -499,7 +499,7 @@
     import { vibrateMerge, vibrateJackpot, cancelVibration } from './js/haptics.js';
     import { applyStudioEnvironment } from './js/environment.js';
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
-    import { createPlayfieldCup } from './js/playfield-cup.js';
+    import { createPlayfieldCup, applyMergeOrthoCameraPose } from './js/playfield-cup.js';
     import { createTryMerge } from './js/merge-engine.js';
     import { massForFruitSpec } from './js/ball-mass.js';
     import {
@@ -1442,7 +1442,7 @@
       }
       juice.updateParticles(dt);
       updateCameraFrustum();
-      camera.position.set(0, orthoLayout.orthoMidY, 20);
+      applyMergeOrthoCameraPose(camera, orthoLayout.orthoMidY);
 
       renderer.render(scene, camera);
     }

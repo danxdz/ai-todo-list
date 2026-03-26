@@ -28,12 +28,12 @@
   --menu-panel-bg: linear-gradient(168deg, rgba(18, 36, 28, 0.98), rgba(8, 18, 12, 0.99));
 }
 
-/* Top-right: menu + optional mute — keeps bottom strip minimal */
+/* Top-right: menu + optional mute — stats bar stays left with padding on #hud */
 .merge-game .hud-top-actions {
   position: fixed;
   top: max(8px, env(safe-area-inset-top, 0px));
   right: max(10px, env(safe-area-inset-right, 0px));
-  z-index: 5;
+  z-index: 6;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -46,12 +46,15 @@
   pointer-events: auto;
 }
 
-/* Bottom HUD bar — one strip, safe-area aware */
+/* Top HUD bar — keeps full playfield visible at bottom; class name .bottom-bar kept for HTML */
 .merge-game #hud {
   position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
   left: max(10px, env(safe-area-inset-left, 0px));
   right: max(10px, env(safe-area-inset-right, 0px));
-  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  /* Reserve space for Menu (+ mute on atoms) in .hud-top-actions */
+  padding-right: min(132px, 28vw);
+  bottom: auto;
   z-index: 3;
   pointer-events: none;
 }
@@ -60,7 +63,7 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px 8px;
   padding: 4px 8px;
   border-radius: 10px;
@@ -69,7 +72,7 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   max-width: min(100%, 520px);
-  margin-left: auto;
+  margin-left: 0;
   margin-right: auto;
 }
 

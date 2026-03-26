@@ -7,6 +7,19 @@ import * as CANNON from 'cannon-es';
 
 /** @typedef {'marble' | 'numbers' | 'atoms'} PlayfieldThemeId */
 
+/**
+ * Orthographic camera: slight low tilt so the cup reads more 3D than pure front-on.
+ * @param {import('three').OrthographicCamera} camera
+ * @param {number} midY — matches orthoLayout.orthoMidY from fitCameraToCup
+ */
+export function applyMergeOrthoCameraPose(camera, midY) {
+  const camTiltY = 0.95;
+  const lookYFocus = midY + 0.1;
+  camera.position.set(0, midY - camTiltY, 20.2);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0, lookYFocus, 0);
+}
+
 /** @type {Record<PlayfieldThemeId, { backGrad: string[]; backRadial: string; floorGrad: string[]; zoneEmissive: number; floorEmissive: number; baseColor: number; glassColor: number }>} */
 export const PLAYFIELD_THEMES = {
   marble: {
@@ -360,9 +373,7 @@ export function createPlayfieldCup(opts) {
     const halfSpanY = (highWorld - lowWorld) / 2;
     applyCupOrthoFrame({ halfW, halfSpanY, midY });
 
-    camera.position.set(0, midY, 20);
-    camera.up.set(0, 1, 0);
-    camera.lookAt(0, midY, 0);
+    applyMergeOrthoCameraPose(camera, midY);
     camera.near = 0.35;
     camera.far = 95;
   }

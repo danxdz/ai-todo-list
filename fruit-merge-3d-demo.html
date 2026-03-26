@@ -277,11 +277,13 @@
 <body>
   <div id="danger-panic" aria-hidden="true"></div>
   <div id="floatFx" aria-hidden="true"></div>
+  <div class="hud-top-actions">
+    <button type="button" class="hud-menu-btn" id="gameMenuOpenBtn" aria-expanded="false" aria-controls="gameMenu" data-i18n="common.menu">Menu</button>
+  </div>
   <div id="hud">
     <div class="bottom-bar">
       <div class="hud-stats-row">
         <div class="hud-inline">
-          <div class="hud-brand"><span data-i18n="marble.title">Ceramic stack</span> <strong id="buildId">v61</strong></div>
           <div class="hud-stat">
             <span class="hud-label" data-i18n="common.score">Score</span>
             <span class="hud-value" id="scoreVal">0</span>
@@ -292,13 +294,10 @@
           </div>
           <div class="hud-stat">
             <span class="hud-label" data-i18n="common.combo">Combo</span>
-            <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
+            <span class="hud-value" id="comboMultVal" style="font-size:clamp(1rem,4.5vw,1.35rem)">—</span>
           </div>
           <div class="hud-sub"><span data-i18n="common.nextPts">Next</span> <span id="nextLvlVal">200</span> pts</div>
         </div>
-      </div>
-      <div class="hud-actions">
-        <button type="button" class="hud-menu-btn" id="gameMenuOpenBtn" aria-expanded="false" aria-controls="gameMenu" data-i18n="common.menu">Menu</button>
       </div>
     </div>
   </div>
@@ -307,6 +306,7 @@
     <div class="game-menu-panel">
       <button type="button" class="game-menu-close" id="gameMenuCloseBtn" data-i18n-aria="common.close">×</button>
       <h2 id="gameMenuTitle" data-i18n="common.menu">Menu</h2>
+      <p class="menu-muted" style="font-size:10px;opacity:0.6;margin:-2px 0 6px"><span id="buildId">v61</span></p>
       <p class="menu-muted" data-i18n="common.releaseToDrop">Slide to aim, release to drop.</p>
       <div class="menu-lang">
         <label for="langSelect"><span data-i18n="common.language">Language</span></label>
@@ -508,7 +508,7 @@
     function updatePanicVisuals(stress) {
       if (!panicEl) return;
       const u = Math.max(0, (stress - 0.22) / 0.78);
-      panicEl.style.opacity = String(0.04 + u * u * 0.82);
+      panicEl.style.opacity = String(u * u * 0.86);
     }
 
     function syncHud() {
@@ -1078,6 +1078,7 @@
       },
       {
         mergeResult: 'nextTier',
+        vfxLevel: 'minimal',
         jackpotFloatTier: (jpPts) => `★ +${jpPts}`,
         onNormalMergeUi: (mergePts, newType, nx, ny, spec) => {
           const fc = new THREE.Color(spec.color);

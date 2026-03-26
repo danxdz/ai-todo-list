@@ -28,12 +28,30 @@
   --menu-panel-bg: linear-gradient(168deg, rgba(18, 36, 28, 0.98), rgba(8, 18, 12, 0.99));
 }
 
+/* Top-right: menu + optional mute — keeps bottom strip minimal */
+.merge-game .hud-top-actions {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  z-index: 5;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.merge-game .hud-top-actions .hud-menu-btn,
+.merge-game .hud-top-actions .hud-mute-btn {
+  pointer-events: auto;
+}
+
 /* Bottom HUD bar — one strip, safe-area aware */
 .merge-game #hud {
   position: fixed;
   left: max(10px, env(safe-area-inset-left, 0px));
   right: max(10px, env(safe-area-inset-right, 0px));
-  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
   z-index: 3;
   pointer-events: none;
 }
@@ -42,14 +60,15 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 10px;
-  padding: 6px 10px;
-  border-radius: 12px;
+  justify-content: center;
+  gap: 6px 8px;
+  padding: 4px 8px;
+  border-radius: 10px;
   background: var(--hud-glass);
   border: 1px solid var(--hud-border);
-  backdrop-filter: blur(12px);
-  max-width: min(100%, 560px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: min(100%, 520px);
   margin-left: auto;
   margin-right: auto;
 }
@@ -74,9 +93,9 @@
 .merge-game .btn-ghost,
 .merge-game .hud-menu-btn {
   pointer-events: auto;
-  padding: 7px 11px;
+  padding: 5px 9px;
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -95,8 +114,8 @@
 
 .merge-game .hud-mute-btn {
   pointer-events: auto;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 5px 9px;
+  font-size: 10px;
   font-weight: 700;
   border-radius: 10px;
   border: 1px solid var(--hud-border);
@@ -128,14 +147,6 @@
   flex: 1 1 auto;
 }
 
-.merge-game .hud-inline .hud-brand {
-  flex: 0 0 auto;
-  max-width: 38%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .merge-game .hud-inline .hud-stat {
   flex: 0 0 auto;
 }
@@ -149,9 +160,6 @@
 }
 
 @media (max-width: 360px) {
-  .merge-game .hud-inline .hud-brand {
-    max-width: 32%;
-  }
   .merge-game .hud-value {
     font-size: clamp(1.05rem, 5.5vw, 1.45rem);
   }
@@ -161,7 +169,16 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.12rem;
+  gap: 0.06rem;
+}
+
+.merge-game #hud .hud-label {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.merge-game #hud .hud-value {
+  font-size: clamp(1rem, 4.2vw, 1.32rem);
 }
 
 /* Legacy top-right HUD → treat same as column inside bar */

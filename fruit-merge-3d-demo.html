@@ -484,10 +484,11 @@
       aimKeyLightAt,
     } from './js/render.js';
     import { initPhysicsDebugUI, togglePhysDebugPanel } from './js/ui.js';
-    import { scoreWithMultiplier } from './js/gameplay.js';
     import { vibrateMerge, vibrateJackpot, cancelVibration } from './js/haptics.js';
     import { applyStudioEnvironment } from './js/environment.js';
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
+    import { createPlayfieldCup } from './js/playfield-cup.js';
+    import { createTryMerge } from './js/merge-engine.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
     /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
@@ -827,316 +828,42 @@
 
     initFruitVisuals();
 
-    /** Shared GPU textures for cup — materials detached before dispose on rebuild */
-    let playfieldMaps = null;
-    function ensurePlayfieldMaps() {
-      if (playfieldMaps) return playfieldMaps;
-      const bw = 384;
-      const bh = 640;
-      const cb = document.createElement('canvas');
-      cb.width = bw;
-      cb.height = bh;
-      const bx = cb.getContext('2d');
-      const vg = bx.createLinearGradient(0, 0, 0, bh);
-      vg.addColorStop(0, '#4a6088');
-      vg.addColorStop(0.22, '#3d4f72');
-      vg.addColorStop(0.5, '#2c3a58');
-      vg.addColorStop(0.78, '#242e48');
-      vg.addColorStop(1, '#1a2238');
-      bx.fillStyle = vg;
-      bx.fillRect(0, 0, bw, bh);
-      const rg = bx.createRadialGradient(bw * 0.5, bh * 0.35, bh * 0.08, bw * 0.45, bh * 0.42, bh * 0.62);
-      rg.addColorStop(0, 'rgba(120, 160, 220, 0.22)');
-      rg.addColorStop(0.45, 'rgba(60, 90, 140, 0.08)');
-      rg.addColorStop(1, 'rgba(20, 28, 48, 0)');
-      bx.fillStyle = rg;
-      bx.fillRect(0, 0, bw, bh);
-      bx.globalAlpha = 0.14;
-      for (let i = 0; i < 900; i++) {
-        bx.fillStyle = `rgba(255,255,255,${0.03 + Math.random() * 0.06})`;
-        bx.fillRect(Math.random() * bw, Math.random() * bh, 1.2, 2.2 + Math.random() * 3);
-      }
-      bx.globalAlpha = 1;
-      const backMap = new THREE.CanvasTexture(cb);
-      backMap.colorSpace = THREE.SRGBColorSpace;
-
-      const fs = 256;
-      const cf = document.createElement('canvas');
-      cf.width = fs;
-      cf.height = fs;
-      const fx = cf.getContext('2d');
-      const fg = fx.createRadialGradient(fs * 0.5, fs * 0.5, 0, fs * 0.5, fs * 0.5, fs * 0.72);
-      fg.addColorStop(0, '#5a6e90');
-      fg.addColorStop(0.55, '#3d4d68');
-      fg.addColorStop(1, '#2a3548');
-      fx.fillStyle = fg;
-      fx.fillRect(0, 0, fs, fs);
-      fx.strokeStyle = 'rgba(255,255,255,0.04)';
-      fx.lineWidth = 1;
-      const step = 32;
-      for (let x = 0; x <= fs; x += step) {
-        fx.beginPath();
-        fx.moveTo(x, 0);
-        fx.lineTo(x, fs);
-        fx.stroke();
-      }
-      for (let y = 0; y <= fs; y += step) {
-        fx.beginPath();
-        fx.moveTo(0, y);
-        fx.lineTo(fs, y);
-        fx.stroke();
-      }
-      fx.globalAlpha = 0.12;
-      for (let i = 0; i < 4000; i++) {
-        fx.fillStyle = `rgba(0,0,0,${0.02 + Math.random() * 0.05})`;
-        fx.fillRect(Math.random() * fs, Math.random() * fs, 1.5, 1.5);
-      }
-      fx.globalAlpha = 1;
-      const floorMap = new THREE.CanvasTexture(cf);
-      floorMap.wrapS = floorMap.wrapT = THREE.RepeatWrapping;
-      floorMap.repeat.set(2.2, 2.2);
-      floorMap.colorSpace = THREE.SRGBColorSpace;
-
-      playfieldMaps = { backMap, floorMap };
-      return playfieldMaps;
-    }
-
-    const cupGroup = new THREE.Group();
-    scene.add(cupGroup);
-
     const queuePreviewGroup = new THREE.Group();
     queuePreviewGroup.renderOrder = 14;
     scene.add(queuePreviewGroup);
 
-    let floorVis = null;
-    let dangerLine = null;
-
-    const staticBodies = [];
-
     const { world, physicsMaterial, fruitContact, applyPhysicsTuning: applyPhysicsTuningToBodies } =
       createPhysicsWorld();
 
-    function clearCupVisuals() {
-      while (cupGroup.children.length) {
-        const o = cupGroup.children.pop();
-        if (o.geometry) o.geometry.dispose();
-        if (o.material) {
-          const m = o.material;
-          m.map = null;
-          m.roughnessMap = null;
-          m.normalMap = null;
-          m.dispose?.();
-        }
-      }
-      floorVis = null;
-      dangerLine = null;
-    }
-
-    function buildCupVisuals() {
-      clearCupVisuals();
-      const maps = ensurePlayfieldMaps();
-      const wh = CUP.wallH;
-      const hx = CUP.halfX;
-      const hz = CUP.halfZ;
-      const wt = CUP.wallT;
-      const backZ = ROW_Z - 0.52;
-      const innerX = hx - wt;
-      const frontZ = hz - 0.02;
-
-      const backW = hx * 2 + wt * 2 + 0.55;
-      const backH = wh + 0.75;
-      const zoneBackMat = new THREE.MeshStandardMaterial({
-        map: maps.backMap,
-        color: 0xffffff,
-        roughness: 0.88,
-        metalness: 0.04,
-        emissive: 0x1a2238,
-        emissiveIntensity: 0.14,
-        envMapIntensity: 0.35,
-      });
-      const zoneBack = new THREE.Mesh(new THREE.PlaneGeometry(backW, backH), zoneBackMat);
-      zoneBack.position.set(0, wh * 0.5 - 0.08, backZ);
-      zoneBack.receiveShadow = true;
-      cupGroup.add(zoneBack);
-
-      const floorMat = new THREE.MeshStandardMaterial({
-        map: maps.floorMap,
-        color: 0xffffff,
-        roughness: 0.82,
-        metalness: 0.08,
-        emissive: 0x151a28,
-        emissiveIntensity: 0.08,
-        envMapIntensity: 0.4,
-      });
-      const floorGeo = new THREE.PlaneGeometry(innerX * 2 + 0.08, hz * 2 + 0.08);
-      floorVis = new THREE.Mesh(floorGeo, floorMat);
-      floorVis.rotation.x = -Math.PI / 2;
-      floorVis.position.y = 0.002;
-      floorVis.receiveShadow = true;
-      cupGroup.add(floorVis);
-
-      const baseMat = new THREE.MeshStandardMaterial({
-        color: 0x252b3a,
-        roughness: 0.9,
-        metalness: 0.18,
-        envMapIntensity: 0.45,
-      });
-      const baseH = 0.16;
-      const baseMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(innerX * 2 + 0.28, baseH, hz * 2 + 0.28),
-        baseMat,
-      );
-      baseMesh.position.set(0, -baseH * 0.5 + 0.01, 0);
-      baseMesh.castShadow = true;
-      baseMesh.receiveShadow = true;
-      cupGroup.add(baseMesh);
-
-      const makeWallGlass = () =>
-        new THREE.MeshPhysicalMaterial({
-          color: 0xa8c0e8,
-          metalness: 0,
-          roughness: 0.08,
-          transmission: 0.62,
-          thickness: 0.35,
-          ior: 1.48,
-          transparent: true,
-          opacity: 0.32,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          envMapIntensity: 1,
-        });
-      const wallH = wh + 0.45;
-      const wallWz = hz * 2 + 0.06;
-      const addWall = (x, ry) => {
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(wallWz, wallH), makeWallGlass());
-        m.position.set(x, wallH * 0.48, 0);
-        m.rotation.y = ry;
-        m.receiveShadow = true;
-        cupGroup.add(m);
-      };
-      addWall(-innerX + 0.012, Math.PI / 2);
-      addWall(innerX - 0.012, -Math.PI / 2);
-
-      const frontWall = new THREE.Mesh(
-        new THREE.PlaneGeometry(innerX * 2 - 0.04, wallH),
-        makeWallGlass(),
-      );
-      frontWall.position.set(0, wallH * 0.48, frontZ);
-      frontWall.rotation.y = Math.PI;
-      frontWall.receiveShadow = true;
-      cupGroup.add(frontWall);
-
-      const lineMat = new THREE.MeshBasicMaterial({
-        color: 0xff5566,
-        transparent: true,
-        opacity: 0.38,
-        depthWrite: false,
-      });
-      const lineGeo = new THREE.PlaneGeometry(innerX * 2 - 0.02, 0.1);
-      dangerLine = new THREE.Mesh(lineGeo, lineMat);
-      dangerLine.rotation.x = -Math.PI / 2;
-      dangerLine.position.set(0, GAME_OVER_Y + 0.01, ROW_Z + 0.02);
-      cupGroup.add(dangerLine);
-    }
-
-    function clearStaticPhysics() {
-      for (const b of staticBodies) world.removeBody(b);
-      staticBodies.length = 0;
-    }
-
-    function buildStaticPhysics() {
-      clearStaticPhysics();
-      const hx = CUP.halfX;
-      const hz = CUP.halfZ;
-      const wt = CUP.wallT;
-      const wh = CUP.wallH;
-      /** Floor collider: top surface exactly y=0 (same as visual floor) */
-      addStaticBox(hx + wt, 0.04, hz + wt, 0, -0.04, 0);
-      addStaticBox(wt / 2, wh / 2, hz + wt, -hx - wt / 2, wh / 2, 0);
-      addStaticBox(wt / 2, wh / 2, hz + wt,  hx + wt / 2, wh / 2, 0);
-      addStaticBox(hx, wh / 2, wt / 2, 0, wh / 2, -hz - wt / 2);
-      addStaticBox(hx, wh / 2, wt / 2, 0, wh / 2,  hz + wt / 2);
-    }
-
-    function addStaticBox(hx, hy, hz, x, y, z) {
-      const shape = new CANNON.Box(new CANNON.Vec3(hx, hy, hz));
-      const body = new CANNON.Body({ mass: 0 });
-      body.addShape(shape);
-      body.position.set(x, y, z);
-      world.addBody(body);
-      staticBodies.push(body);
-    }
-
-    /** Max |x| for sphere center inside inner walls — small pad so tiny tiers aren’t clamped inward as much. */
-    function innerHalfXForRadius(radius) {
-      const innerFace = CUP.halfX - CUP.wallT;
-      const pad = 0.019 + Math.min(0.024, radius * 0.011);
-      return Math.max(0.05, innerFace - radius - pad);
-    }
-
-    function clampDropXZ(x, _z, radius) {
-      const lim = innerHalfXForRadius(radius);
-      return {
-        x: Math.max(-lim, Math.min(lim, x)),
-        z: ROW_Z,
-      };
-    }
-
-    function computeCupHeightForViewport(viewportH) {
-      const minH = 9.2;
-      const maxH = 16.5;
-      const t = Math.min(1, viewportH / 620);
-      return minH + (maxH - minH) * t;
-    }
-
-    function fitCameraToCup() {
-      const wh = CUP.wallH;
-      const hx = CUP.halfX;
-      const wt = CUP.wallT;
-      const rimTop = Math.max(wh, DROP_CENTER_Y, GAME_OVER_Y);
-      /** Match ortho width to the back-panel plane (same as buildCupVisuals `backW`) */
-      const backW = hx * 2 + wt * 2 + 0.55;
-      const halfW = backW / 2 + 0.04;
-
-      const floorY = 0;
-      const backH = wh + 0.75;
-      const backCenterY = wh * 0.5 - 0.08;
-      const panelTop = backCenterY + backH / 2;
-      const panelBot = backCenterY - backH / 2;
-      const padBelow = 0.52;
-      const contentLow = Math.min(panelBot - 0.06, floorY - padBelow);
-      /** Extra headroom so the compact top queue strip sits inside frame with margin */
-      const contentHigh =
-        Math.max(panelTop + 0.12, rimTop + 0.62, DROP_CENTER_Y + 0.72) + 0.55;
-
-      const vMargin = 0.22;
-      const lowWorld = contentLow - vMargin;
-      const highWorld = contentHigh + vMargin;
-      const midY = (lowWorld + highWorld) / 2;
-      /** Ortho left/right/top/bottom are in camera space. With camera at y=midY, world y maps to y_cam ≈ y_world − midY — not absolute world y. */
-      const halfSpanY = (highWorld - lowWorld) / 2;
-      applyCupOrthoFrame({ halfW, halfSpanY, midY });
-
-      camera.position.set(0, midY, 20);
-      camera.up.set(0, 1, 0);
-      camera.lookAt(0, midY, 0);
-      camera.near = 0.35;
-      camera.far = 95;
-    }
-
-    function applyCupLayout() {
-      const { height: vh } = getViewportSize();
-      CUP.wallH = computeCupHeightForViewport(vh);
-      DROP_CENTER_Y = CUP.wallH - 0.55;
-      // Just under rim — must stay above drop + largest spawn radius (~0.26) or first click = game over
-      GAME_OVER_Y = CUP.wallH - GAME_OVER_BELOW_RIM;
-      buildCupVisuals();
-      buildStaticPhysics();
-      fitCameraToCup();
-      aimKeyLightAt(keyLight, CUP.wallH * 0.36 + 0.35, ROW_Z);
-      syncCanvasToViewport();
-      if (dangerLine) dangerLine.position.y = GAME_OVER_Y + 0.012;
-    }
+    const {
+      cupGroup,
+      innerHalfXForRadius,
+      clampDropXZ,
+      applyCupLayout,
+      dangerLine,
+    } = createPlayfieldCup({
+      scene,
+      world,
+      camera,
+      keyLight,
+      aimKeyLightAt,
+      getViewportSize,
+      applyCupOrthoFrame,
+      syncCanvasToViewport,
+      ROW_Z,
+      CUP_BASE,
+      CUP,
+      getDropCenterY: () => DROP_CENTER_Y,
+      setDropCenterY: (v) => {
+        DROP_CENTER_Y = v;
+      },
+      getGameOverY: () => GAME_OVER_Y,
+      setGameOverY: (v) => {
+        GAME_OVER_Y = v;
+      },
+      GAME_OVER_BELOW_RIM,
+      themeId: 'marble',
+    });
 
     /** @type {{ mesh: THREE.Mesh, body: CANNON.Body, type: number, fusionT?: number, fusionDur?: number }[]} */
     let fruits = [];
@@ -1347,126 +1074,51 @@
       fruits = fruits.filter((f) => f !== entry);
     }
 
-    function tryMerge() {
-      if (mergeCooldown > 0 || gameOver) return;
-      const MAX_TYPE = FRUITS.length - 1;
-      /** Biggest tier has nothing above it — Suika-style: two touching vanish + jackpot (frees space). */
-      const JACKPOT_MERGE_PTS = MERGE_POINTS[MAX_TYPE] * 5 + 180;
-
-      for (let i = 0; i < fruits.length; i++) {
-        for (let j = i + 1; j < fruits.length; j++) {
-          const a = fruits[i];
-          const b = fruits[j];
-          if (a.type !== MAX_TYPE || b.type !== MAX_TYPE) continue;
-          const rMax = FRUITS[MAX_TYPE].radius;
-          const touch = rMax + rMax;
-          const dx = a.body.position.x - b.body.position.x;
-          const dy = a.body.position.y - b.body.position.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist > touch * JACKPOT_MERGE_DIST_MULT) continue;
-          const nowJp = performance.now();
-          const chainJp =
-            nowJp - lastMergeAtMs <= COMBO_CHAIN_SEC * 1000 ? comboChain : 0;
-          const jm = mergeComboMultBeforeBump();
-          bumpMergeCombo();
-          const jx = (a.body.position.x + b.body.position.x) / 2;
-          const jy = (a.body.position.y + b.body.position.y) / 2;
-          const jackHeat = 1 + chainJp * 0.22 + (jm - 1) * 0.35;
-          const jBurst = Math.min(120, 52 + chainJp * 22 + Math.floor((jm - 1) * 18));
-          const jBoost = 1 + chainJp * 0.11 + (jm - 1) * 0.14;
-          const jpPts = scoreWithMultiplier(JACKPOT_MERGE_PTS, jm);
-          juice.burst(jx, jy, ROW_Z + 0.02, FRUITS[MAX_TYPE].color, jBurst, jBoost, 'jackpot');
-          juice.burstSparks(jx, jy, ROW_Z + 0.05, FRUITS[MAX_TYPE].color, 28);
-          queueHitPause(0.088);
-          beginJackpotVanish(a);
-          beginJackpotVanish(b);
-          addScore(jpPts, { skipScorePulse: true });
-          popFloatText(`★ +${jpPts}`, jx, jy, ROW_Z + 0.42, { jackpot: true, color: '#ffe8a8' });
-          flashHudMerge(scoreEl);
-          Sfx.playJackpot(jackHeat);
-          vibrateJackpot(jackHeat);
-          mergeCooldown = 14;
-          return;
-        }
-      }
-
-      const dynamics = fruits.filter((f) => f.type <= MERGEABLE_TYPE_MAX);
-      for (let i = 0; i < dynamics.length; i++) {
-        for (let j = i + 1; j < dynamics.length; j++) {
-          const a = dynamics[i];
-          const b = dynamics[j];
-          if (a.type !== b.type) continue;
-          const ra = FRUITS[a.type].radius;
-          const rb = FRUITS[b.type].radius;
-          const touch = ra + rb;
-          const dist = a.body.position.distanceTo(b.body.position);
-          if (dist > touch * MERGE_DIST_MULT) continue;
-
-          const nx = (a.body.position.x + b.body.position.x) / 2;
-          const ny = (a.body.position.y + b.body.position.y) / 2;
-          const newType = a.type + 1;
-          const rNew = FRUITS[newType].radius;
-          const lim = innerHalfXForRadius(rNew);
-          const cx = Math.max(-lim, Math.min(lim, nx));
-          /** Spawn from lowest parent bottom so the new sphere “sits” on support instead of popping the stack */
-          const bottomA = a.body.position.y - ra;
-          const bottomB = b.body.position.y - rb;
-          const mergeBottom = Math.min(bottomA, bottomB);
-          const nySpawn = Math.max(rNew + 0.01, mergeBottom + rNew + 0.003);
-
-          const va = a.body.velocity;
-          const vb = b.body.velocity;
-          const ma = a.body.mass;
-          const mb = b.body.mass;
-          const invSum = 1 / (ma + mb);
-          const s = physicsTuning.mergeVelScale;
-          let mvx = (ma * va.x + mb * vb.x) * invSum * s;
-          let mvy = (ma * va.y + mb * vb.y) * invSum * s;
-          /** Kill most upward kick from merges under a pile */
-          mvx *= 0.72;
-          mvy *= mvy > 0 ? 0.22 : 0.62;
-
-          const nowM = performance.now();
-          const chainSnap =
-            nowM - lastMergeAtMs <= COMBO_CHAIN_SEC * 1000 ? comboChain : 0;
-          const mult = mergeComboMultBeforeBump();
-          bumpMergeCombo();
-          const mergeIntensity = 1 + mult * 0.2 + chainSnap * 0.09;
-          const pCount = Math.min(96, 38 + chainSnap * 15 + Math.floor((mult - 1) * 12));
-          const pBoost = 1 + chainSnap * 0.1 + (mult - 1) * 0.16;
-          const mergePts = scoreWithMultiplier(MERGE_POINTS[a.type] ?? 20, mult);
-          juice.burst(nx, ny, ROW_Z + 0.02, FRUITS[a.type].color, pCount, pBoost, 'merge');
-          juice.burstSparks(nx, ny, ROW_Z + 0.06, FRUITS[a.type].color, Math.min(26, 12 + Math.floor(pCount * 0.22)));
-          queueHitPause(0.052);
-
-          removeFruit(a);
-          removeFruit(b);
-          spawnFruit(newType, cx, nySpawn, ROW_Z, { fusionPop: true });
-          const merged = fruits[fruits.length - 1];
-          const cap = 12;
-          const sp = Math.hypot(mvx, mvy);
-          if (sp > cap) {
-            const k = cap / sp;
-            mvx *= k;
-            mvy *= k;
-          }
-          merged.body.velocity.set(mvx, mvy, 0);
-          merged.body.angularVelocity.set(0, 0, 0);
-          addScore(mergePts, { skipScorePulse: true });
-          {
-            const fc = new THREE.Color(FRUITS[newType].color);
-            popFloatText(`+${mergePts}`, nx, ny + FRUITS[newType].radius * 0.42, ROW_Z + 0.48, {
-              color: `#${fc.getHexString()}`,
-            });
-          }
-          flashHudMerge(scoreEl);
-          Sfx.playMerge(newType, mult);
-          vibrateMerge(mergeIntensity);
-          mergeCooldown = 14;
-          return;
-        }
-      }
-    }
+    const tryMerge = createTryMerge(
+      {
+        getGameOver: () => gameOver,
+        getMergeCooldown: () => mergeCooldown,
+        setMergeCooldown: (n) => {
+          mergeCooldown = n;
+        },
+        juice,
+        getFruits: () => fruits,
+        removeFruit,
+        spawnFruit,
+        innerHalfXForRadius,
+        ROW_Z,
+        FRUITS,
+        MERGE_POINTS,
+        MERGEABLE_TYPE_MAX,
+        MERGE_DIST_MULT,
+        JACKPOT_MERGE_DIST_MULT,
+        COMBO_CHAIN_SEC,
+        physicsTuning,
+        mergeComboMultBeforeBump,
+        bumpMergeCombo,
+        queueHitPause,
+        beginJackpotVanish,
+        addScore,
+        popFloatText,
+        flashHudMerge,
+        scoreEl,
+        Sfx,
+        vibrateJackpot,
+        vibrateMerge,
+        lastMergeAtMs: () => lastMergeAtMs,
+        comboChain: () => comboChain,
+      },
+      {
+        mergeResult: 'nextTier',
+        jackpotFloatTier: (jpPts) => `★ +${jpPts}`,
+        onNormalMergeUi: (mergePts, newType, nx, ny, spec) => {
+          const fc = new THREE.Color(spec.color);
+          popFloatText(`+${mergePts}`, nx, ny + spec.radius * 0.42, ROW_Z + 0.48, {
+            color: `#${fc.getHexString()}`,
+          });
+        },
+      },
+    );
 
     function checkGameOver(dt) {
       if (gameOver) return;

@@ -500,6 +500,7 @@
   </style>
 </head>
 <body>
+  <div id="retentionToastHost" aria-live="polite"></div>
   <div id="danger-panic" aria-hidden="true"></div>
   <div id="confettiHost" aria-hidden="true"></div>
   <div id="floatFx" aria-hidden="true"></div>
@@ -543,6 +544,8 @@
           <option value="pt">Português</option>
         </select>
       </div>
+      <div class="menu-streak-row" data-retention-streak role="status"></div>
+      <button type="button" class="menu-share-btn" id="shareGameBtn" data-i18n="retention.share">Share</button>
       <h3 style="margin:0;font-size:13px;color:rgba(200,235,215,0.95)" data-i18n="common.howToPlay">How to play</h3>
       <p class="menu-muted" id="gameMenuHowTo"></p>
       <h3 style="margin:8px 0 0;font-size:13px;color:rgba(200,235,215,0.95)" data-i18n="common.controls">Controls</h3>
@@ -620,6 +623,15 @@
         <a href="fruit-merge-3d-demo.html" data-i18n="common.linkMarbles">Marbles</a>
         <a href="index.html" data-i18n="common.mainMenu">Main menu</a>
       </div>
+    </div>
+  </div>
+
+  <div id="welcomeAtoms" role="dialog" aria-modal="true" aria-labelledby="welcomeAtomsTitle" aria-hidden="true">
+    <div class="welcome-atoms-panel">
+      <h2 id="welcomeAtomsTitle"></h2>
+      <div id="welcomeAtomsLines"></div>
+      <p class="welcome-atoms-fact" id="welcomeAtomsFact"></p>
+      <button type="button" class="welcome-atoms-play" id="welcomeAtomsPlay"></button>
     </div>
   </div>
 
@@ -724,6 +736,11 @@
     import { massForFruitSpec } from './js/ball-mass.js';
     import { t, applyI18n } from './js/i18n.js';
     import { initMergeGameShell } from './js/ui-shell.js';
+    import {
+      showRetentionToast,
+      setAtomsTutorialMergeDone,
+      hasCompletedAtomsTutorialMerge,
+    } from './js/retention.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
     /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
@@ -762,7 +779,12 @@
 
     const Sfx = createSfx();
     document.body.addEventListener('pointerdown', () => Sfx.resume(), { passive: true });
-    const { closeGameMenu, openGameMenu } = initMergeGameShell({ themeId: 'atoms', Sfx, showMute: true });
+    const { closeGameMenu, openGameMenu } = initMergeGameShell({
+      themeId: 'atoms',
+      Sfx,
+      showMute: true,
+      welcomeAtoms: true,
+    });
 
     const TOTAL_ELEMENTS = FRUITS.length;
     /** @type {number[]} atomic numbers first unlocked ever during this run */
@@ -910,6 +932,9 @@
       if (firstEver) {
         runFirstEverZs.push(z);
         spawnMiniConfetti();
+        const spec = FRUITS.find((s) => s.atomicNumber === z) ?? null;
+        const sym = spec?.symbol ?? '?';
+        showRetentionToast({ message: t('retention.firstDiscovery', { symbol: sym }) });
       }
       if (discoveryOpen) refreshDiscoveryGrid();
     }
@@ -1569,6 +1594,10 @@
           });
           if (el.fact) showAtomFact(`${el.name} (${el.symbol}): ${el.fact}`);
           noteElementDiscovered(el.atomicNumber);
+          if (!hasCompletedAtomsTutorialMerge()) {
+            setAtomsTutorialMergeDone();
+            showRetentionToast({ message: t('retention.tutorialMergeDone'), ms: 4000 });
+          }
         },
       },
     );

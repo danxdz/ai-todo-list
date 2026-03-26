@@ -348,3 +348,135 @@
 .merge-game #help {
   display: none !important;
 }
+
+.merge-game .menu-streak-row {
+  margin: 8px 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(170, 200, 235, 0.85);
+}
+
+.merge-game.theme-atoms .menu-streak-row {
+  color: rgba(160, 230, 200, 0.88);
+}
+
+.merge-game .menu-share-btn {
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid var(--hud-border);
+  background: rgba(28, 40, 62, 0.75);
+  color: var(--hud-accent);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.merge-game #welcomeAtoms {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 22;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: rgba(4, 10, 18, 0.72);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.merge-game #welcomeAtoms.visible {
+  display: flex;
+}
+
+.merge-game .welcome-atoms-panel {
+  width: min(380px, 100%);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  background: var(--menu-panel-bg);
+  border: 1px solid var(--hud-border);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
+.merge-game .welcome-atoms-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--menu-accent);
+}
+
+.merge-game .welcome-atoms-line {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(190, 210, 235, 0.92);
+}
+
+.merge-game.theme-atoms .welcome-atoms-line {
+  color: rgba(200, 235, 218, 0.92);
+}
+
+.merge-game .welcome-atoms-fact {
+  margin: 10px 0 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-style: italic;
+  opacity: 0.9;
+  color: rgba(160, 200, 230, 0.88);
+}
+
+.merge-game.theme-atoms .welcome-atoms-fact {
+  color: rgba(150, 220, 190, 0.88);
+}
+
+.merge-game .welcome-atoms-play {
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: linear-gradient(165deg, rgba(100, 180, 140, 0.95), rgba(40, 100, 80, 0.98));
+  color: #0a1210;
+}
+
+.merge-game #retentionToastHost {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--merge-hud-bottom-reserve, 96px) + 8px);
+  transform: translateX(-50%);
+  z-index: 19;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: min(92vw, 360px);
+}
+
+.merge-game .retention-toast {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: center;
+  color: #e8f4ff;
+  background: rgba(12, 22, 38, 0.92);
+  border: 1px solid rgba(120, 160, 220, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.merge-game .retention-toast.retention-toast--in {
+  opacity: 1;
+  transform: translateY(0);
+}

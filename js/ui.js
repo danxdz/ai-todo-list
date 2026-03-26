@@ -15,6 +15,18 @@ export function togglePhysDebugPanel() {
   tab.textContent = open ? 'Physics debug ▼' : 'Physics debug ▲';
 }
 
+/** Expand the physics panel (used when opening the menu via keyboard). */
+export function ensurePhysDebugPanelOpen() {
+  const panel = document.getElementById('physDbgPanel');
+  const tab = document.getElementById('physDbgTab');
+  if (!panel || !tab) return;
+  if (panel.hidden) {
+    panel.hidden = false;
+    tab.setAttribute('aria-expanded', 'true');
+    tab.textContent = 'Physics debug ▼';
+  }
+}
+
 export function syncPhysicsSliders(physicsTuning) {
   document.querySelectorAll('#physDbgPanel input[data-key]').forEach((el) => {
     const key = el.dataset.key;

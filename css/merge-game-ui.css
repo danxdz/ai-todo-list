@@ -40,12 +40,12 @@
 
 .merge-game .bottom-bar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px 14px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  gap: 8px 10px;
+  padding: 6px 10px;
+  border-radius: 12px;
   background: var(--hud-glass);
   border: 1px solid var(--hud-border);
   backdrop-filter: blur(12px);
@@ -56,9 +56,9 @@
 
 .merge-game .hud-stats-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px 18px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 12px;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -116,6 +116,45 @@
   align-items: flex-start;
   gap: 0.2rem;
   min-width: 0;
+}
+
+/* Single compact row: brand + inline stats (no tall stack) */
+.merge-game .hud-inline {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.merge-game .hud-inline .hud-brand {
+  flex: 0 0 auto;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge-game .hud-inline .hud-stat {
+  flex: 0 0 auto;
+}
+
+.merge-game .hud-inline .hud-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .merge-game .hud-inline .hud-brand {
+    max-width: 32%;
+  }
+  .merge-game .hud-value {
+    font-size: clamp(1.05rem, 5.5vw, 1.45rem);
+  }
 }
 
 .merge-game .hud-stat {
@@ -233,14 +272,45 @@
   text-decoration: underline;
 }
 
-/* Physics debug sits in bottom bar — not a third corner */
+/* Physics debug lives in slide-up menu (keeps playfield visible) */
 .merge-game .phys-dbg-wrap {
-  margin-top: 0;
+  margin-top: 10px;
   font-size: 11px;
   color: #b8c4d8;
   max-width: 100%;
   pointer-events: auto;
-  flex: 1 1 100%;
+}
+
+.merge-game .menu-tier-line,
+.merge-game .menu-tip-line {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(180, 200, 230, 0.88);
+}
+
+.merge-game .menu-tier-line .menu-tier-label,
+.merge-game .menu-tip-line .menu-tip-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(140, 165, 200, 0.65);
+  margin-bottom: 2px;
+}
+
+.merge-game .menu-tip-line {
+  margin-top: 8px;
+}
+
+.merge-game.theme-atoms .menu-tier-line,
+.merge-game.theme-atoms .menu-tip-line {
+  color: rgba(190, 225, 210, 0.9);
+}
+
+.merge-game.theme-atoms .menu-tier-line .menu-tier-label,
+.merge-game.theme-atoms .menu-tip-line .menu-tip-label {
+  color: rgba(130, 190, 160, 0.65);
 }
 
 .merge-game .phys-dbg-wrap button,

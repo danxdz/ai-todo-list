@@ -132,7 +132,7 @@
       }
       100% { filter: inherit; letter-spacing: normal; }
     }
-    .hud-sub#tierHook.tier-ding {
+    #tierHook.tier-ding {
       animation: tierDing 0.85s ease-out;
     }
     @keyframes tierDing {
@@ -280,7 +280,7 @@
   <div id="hud">
     <div class="bottom-bar">
       <div class="hud-stats-row">
-        <div class="hud-column">
+        <div class="hud-inline">
           <div class="hud-brand"><span data-i18n="marble.title">Ceramic stack</span> <strong id="buildId">v61</strong></div>
           <div class="hud-stat">
             <span class="hud-label" data-i18n="common.score">Score</span>
@@ -295,16 +295,39 @@
             <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
           </div>
           <div class="hud-sub"><span data-i18n="common.nextPts">Next</span> <span id="nextLvlVal">200</span> pts</div>
-          <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Studio glaze · tier I</div>
         </div>
       </div>
       <div class="hud-actions">
         <button type="button" class="hud-menu-btn" id="gameMenuOpenBtn" aria-expanded="false" aria-controls="gameMenu" data-i18n="common.menu">Menu</button>
       </div>
+    </div>
+  </div>
+
+  <div id="gameMenu" role="dialog" aria-modal="true" aria-labelledby="gameMenuTitle" aria-hidden="true">
+    <div class="game-menu-panel">
+      <button type="button" class="game-menu-close" id="gameMenuCloseBtn" data-i18n-aria="common.close">×</button>
+      <h2 id="gameMenuTitle" data-i18n="common.menu">Menu</h2>
+      <p class="menu-muted" data-i18n="common.releaseToDrop">Slide to aim, release to drop.</p>
+      <div class="menu-lang">
+        <label for="langSelect"><span data-i18n="common.language">Language</span></label>
+        <select id="langSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="pt">Português</option>
+        </select>
+      </div>
+      <h3 style="margin:0;font-size:13px;color:rgba(200,220,255,0.95)" data-i18n="common.howToPlay">How to play</h3>
+      <p class="menu-muted" id="gameMenuHowTo"></p>
+      <h3 style="margin:8px 0 0;font-size:13px;color:rgba(200,220,255,0.95)" data-i18n="common.controls">Controls</h3>
+      <p class="menu-muted" id="gameMenuControls"></p>
+      <div class="menu-tier-line" id="menuTierLine">
+        <span class="menu-tier-label" data-i18n="common.menuTier">Tier progress</span>
+        <span id="tierHook">Studio glaze · tier I</span>
+      </div>
       <div class="phys-dbg-wrap" id="physDbgWrap">
         <button type="button" class="phys-dbg-tab" id="physDbgTab" aria-expanded="false">Physics debug ▲</button>
         <div class="phys-dbg-panel" id="physDbgPanel" hidden>
-      <h3>Physics</h3>
+      <h3 data-i18n="phys.title">Physics</h3>
       <div class="phys-preset-bar" id="phys-preset-bar">
         <button type="button" class="phys-preset-btn" data-preset="ceramic">Ceramic</button>
         <button type="button" class="phys-preset-btn" data-preset="heavy">Very heavy</button>
@@ -360,28 +383,6 @@
       </details>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div id="gameMenu" role="dialog" aria-modal="true" aria-labelledby="gameMenuTitle" aria-hidden="true">
-    <div class="game-menu-panel">
-      <button type="button" class="game-menu-close" id="gameMenuCloseBtn" data-i18n-aria="common.close">×</button>
-      <h2 id="gameMenuTitle" data-i18n="common.menu">Menu</h2>
-      <p class="menu-muted" data-i18n="common.releaseToDrop">Slide to aim, release to drop.</p>
-      <div class="menu-lang">
-        <label for="langSelect"><span data-i18n="common.language">Language</span></label>
-        <select id="langSelect" aria-label="Language">
-          <option value="en">English</option>
-          <option value="fr">Français</option>
-          <option value="pt">Português</option>
-        </select>
-      </div>
-      <h3 style="margin:0;font-size:13px;color:rgba(200,220,255,0.95)" data-i18n="common.howToPlay">How to play</h3>
-      <p class="menu-muted" id="gameMenuHowTo"></p>
-      <h3 style="margin:8px 0 0;font-size:13px;color:rgba(200,220,255,0.95)" data-i18n="common.controls">Controls</h3>
-      <p class="menu-muted" id="gameMenuControls"></p>
-      <h3 style="margin:8px 0 0;font-size:13px;color:rgba(200,220,255,0.95)" data-i18n="common.physics">Physics</h3>
-      <p class="menu-muted"><kbd>R</kbd> <span data-i18n="common.restart">Restart</span> · <kbd>F</kbd> fullscreen · <kbd>D</kbd> debug</p>
       <div class="menu-links-row">
         <a href="numbers-merge-3d-demo.html" data-i18n="common.linkNumbers">Numbers</a>
         <a href="atoms-merge-3d-demo.html" data-i18n="common.linkAtoms">Atoms</a>
@@ -445,7 +446,7 @@
       addDefaultLights,
       aimKeyLightAt,
     } from './js/render.js';
-    import { initPhysicsDebugUI, togglePhysDebugPanel } from './js/ui.js';
+    import { initPhysicsDebugUI, ensurePhysDebugPanelOpen } from './js/ui.js';
     import { vibrateMerge, vibrateJackpot, cancelVibration } from './js/haptics.js';
     import { applyStudioEnvironment } from './js/environment.js';
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
@@ -481,7 +482,7 @@
 
     const Sfx = createSfx();
     document.body.addEventListener('pointerdown', () => Sfx.resume(), { passive: true });
-    initMergeGameShell({ themeId: 'marble', Sfx });
+    const { openGameMenu } = initMergeGameShell({ themeId: 'marble', Sfx });
     window.addEventListener('mergegame:locale', () => syncHud());
 
     const comboMultEl = document.getElementById('comboMultVal');
@@ -1236,7 +1237,8 @@
       if (e.key === 'f' || e.key === 'F') toggleBrowserFullscreen();
       if (e.key === 'd' || e.key === 'D') {
         if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          togglePhysDebugPanel();
+          openGameMenu();
+          ensurePhysDebugPanelOpen();
           e.preventDefault();
         }
       }

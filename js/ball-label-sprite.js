@@ -39,6 +39,8 @@ export function createElementSymbolSprite(spec) {
     transparent: true,
     depthTest: false,
     depthWrite: false,
+    /** Orthographic + fixed screen size; avoids sprite scale fighting perspective heuristics */
+    sizeAttenuation: false,
   });
   const spr = new THREE.Sprite(mat);
   spr.scale.setScalar(1);
@@ -51,21 +53,25 @@ export function createNumberDigitSprite(spec) {
   const tex = makeCanvasTexture((ctx, s) => {
     ctx.clearRect(0, 0, s, s);
     const numStr = String(spec.number);
-    ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur = s * 0.08;
-    ctx.fillStyle = '#ffffff';
     const numSize = numStr.length >= 2 ? s * 0.36 : s * 0.44;
     ctx.font = `900 ${numSize}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(numStr, s / 2, s / 2 + s * 0.02);
-    ctx.shadowBlur = 0;
+    const cx = s / 2;
+    const cy = s / 2 + s * 0.02;
+    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+    ctx.lineWidth = Math.max(1.5, s * 0.02);
+    ctx.lineJoin = 'round';
+    ctx.strokeText(numStr, cx, cy);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(numStr, cx, cy);
   });
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
     depthTest: false,
     depthWrite: false,
+    sizeAttenuation: false,
   });
   const spr = new THREE.Sprite(mat);
   spr.scale.setScalar(1);
@@ -73,9 +79,13 @@ export function createNumberDigitSprite(spec) {
   return spr;
 }
 
-/** Keep sprite facing camera (ortho +Y up). */
+/**
+ * Sprites already billboard in the vertex shader; do not copy camera.quaternion — that
+ * breaks the sprite model matrix under orthographic cameras and can hide labels entirely.
+ */
 export function updateLabelBillboard(sprite, camera) {
-  sprite.quaternion.copy(camera.quaternion);
+  void sprite;
+  void camera;
 }
 
 /** World scale for sprite so it reads ~right on sphere radius r */
@@ -85,7 +95,8 @@ export function setElementLabelScale(sprite, radius) {
 }
 
 export function setNumberLabelScale(sprite, radius) {
-  const w = radius * 1.62;
+  /** sizeAttenuation false → scale is in world units; tie to sphere radius for readability */
+  const w = radius * 2.05;
   sprite.scale.set(w, w, w);
 }
 

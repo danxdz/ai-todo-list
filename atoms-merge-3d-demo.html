@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
-  <title>Periodic Stack — Atomic merge</title>
+  <title>Periodic Stack — Atomic merge v62</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -522,6 +522,90 @@
       font-style: normal;
       font-size: 11px;
     }
+    .hud-menu-btn {
+      pointer-events: auto;
+      margin-top: 0.35rem;
+      padding: 7px 11px;
+      font: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #e8f4ff;
+      background: rgba(30, 50, 70, 0.75);
+      border: 1px solid rgba(120, 170, 220, 0.35);
+      border-radius: 10px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .hud-menu-btn:active { transform: scale(0.97); }
+    .hud-mute-btn {
+      pointer-events: auto;
+      margin-top: 0.35rem;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 10px;
+      border: 1px solid rgba(120, 170, 220, 0.35);
+      background: rgba(22, 38, 52, 0.85);
+      color: #c8e4ff;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .hud-mute-btn.muted { opacity: 0.55; }
+    #gameMenu {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 17;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 12px;
+      background: rgba(4, 10, 8, 0.45);
+      backdrop-filter: blur(4px);
+      pointer-events: auto;
+    }
+    #gameMenu.visible { display: flex; }
+    .game-menu-panel {
+      width: min(300px, 88vw);
+      max-height: min(72dvh, 480px);
+      overflow: auto;
+      background: linear-gradient(168deg, rgba(22, 42, 34, 0.98), rgba(10, 22, 16, 0.99));
+      border: 1px solid rgba(100, 200, 150, 0.28);
+      border-radius: 14px;
+      padding: 12px 14px 14px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+    .game-menu-panel h2 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      color: #d8f5e4;
+    }
+    .game-menu-panel p {
+      margin: 0 0 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: rgba(170, 210, 185, 0.88);
+    }
+    .game-menu-panel a {
+      display: block;
+      margin: 6px 0;
+      color: #9ee0c0;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .game-menu-panel a:hover { text-decoration: underline; }
+    .game-menu-close {
+      float: right;
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(40, 70, 55, 0.7);
+      color: #c8eed8;
+      font-size: 18px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -530,7 +614,7 @@
   <div id="floatFx" aria-hidden="true"></div>
   <div id="hud">
     <div class="hud-column">
-      <div class="hud-brand">Periodic Stack <strong id="buildId">Atomic merge</strong></div>
+      <div class="hud-brand">Periodic Stack <strong id="buildId">v62</strong></div>
       <div class="hud-stat">
         <span class="hud-label">Score</span>
         <span class="hud-value" id="scoreVal">0</span>
@@ -546,12 +630,22 @@
       <div class="hud-sub">Next <span id="nextLvlVal">200</span> pts</div>
       <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Period 1 · light elements</div>
       <div class="hud-sub" id="atomFact" style="margin-top:0.35rem;max-width:min(200px,40vw);line-height:1.35;min-height:2.6em"></div>
-      <div class="hud-hint">
-        <button type="button" class="hud-disc-btn" id="discOpenBtn">Discovered elements</button><br />
-        <a class="hud-link" href="numbers-merge-3d-demo.html">Number stack →</a><br />
-        <a class="hud-link" href="fruit-merge-3d-demo.html">Marble game →</a><br />
-        <kbd>F</kbd> full
+      <div class="hud-hint" style="margin-top:0.25rem">
+        <button type="button" class="hud-menu-btn" id="gameMenuOpenBtn" aria-expanded="false" aria-controls="gameMenu">Menu</button>
+        <button type="button" class="hud-mute-btn" id="sfxMuteBtn" aria-pressed="false">Sound on</button>
       </div>
+    </div>
+  </div>
+  <div id="gameMenu" role="dialog" aria-modal="true" aria-labelledby="gameMenuTitle" aria-hidden="true">
+    <div class="game-menu-panel">
+      <button type="button" class="game-menu-close" id="gameMenuCloseBtn" aria-label="Close menu">×</button>
+      <h2 id="gameMenuTitle">Game</h2>
+      <p>Release to drop · merge same element · twin heaviest = fusion jackpot · spheres show a Bohr-style shell hint (educational).</p>
+      <p><kbd>R</kbd> restart · <kbd>F</kbd> fullscreen · <kbd>D</kbd> physics</p>
+      <button type="button" class="hud-disc-btn" id="discOpenBtn" style="width:100%;margin-bottom:8px">Discovered elements</button>
+      <a href="numbers-merge-3d-demo.html">Number stack</a>
+      <a href="fruit-merge-3d-demo.html">Marble / ceramic stack</a>
+      <a href="index.html">Main menu</a>
     </div>
   </div>
   <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle" aria-hidden="true">
@@ -564,8 +658,7 @@
     <button type="button" id="overlayRestart">Restart</button>
   </div>
   <div id="help">
-    Drop · merge · fuse — don’t overload the reactor · <strong>fusion jackpot</strong> on twin heaviest<br />
-    <kbd>R</kbd> restart · <kbd>F</kbd> full · <a class="help-link" href="#" id="helpDiscLink">Discovered</a> · <a class="help-link" href="numbers-merge-3d-demo.html">Numbers</a> · <a class="help-link" href="fruit-merge-3d-demo.html">Marbles</a> · <a class="help-link" href="index.html">Menu</a>
+    <a class="help-link" href="#" id="helpMenuLink">Menu</a> · release to drop
   </div>
 
   <div id="discoveryOverlay" role="dialog" aria-modal="true" aria-labelledby="discTitle" aria-hidden="true">
@@ -689,6 +782,7 @@
       GAME_OVER_BELOW_RIM,
     } from './js/config-atoms.js';
     import { drawElementFace2d } from './js/atoms-element-face.js';
+    import { drawAtomShells2d } from './js/atom-shells.js';
     import {
       touchDiscoveredAtomicNumber,
       discoveredCount,
@@ -732,7 +826,11 @@
     const discProgressFill = document.getElementById('discProgressFill');
     const discDetail = document.getElementById('discDetail');
     const confettiHost = document.getElementById('confettiHost');
-    const helpDiscLink = document.getElementById('helpDiscLink');
+    const helpMenuLink = document.getElementById('helpMenuLink');
+    const gameMenu = document.getElementById('gameMenu');
+    const gameMenuOpenBtn = document.getElementById('gameMenuOpenBtn');
+    const gameMenuCloseBtn = document.getElementById('gameMenuCloseBtn');
+    const sfxMuteBtn = document.getElementById('sfxMuteBtn');
 
     let score = 0;
     let level = 1;
@@ -746,6 +844,41 @@
 
     const Sfx = createSfx();
     document.body.addEventListener('pointerdown', () => Sfx.resume(), { passive: true });
+
+    function syncMuteButton() {
+      if (!sfxMuteBtn) return;
+      const m = Sfx.getMuted();
+      sfxMuteBtn.textContent = m ? 'Sound off' : 'Sound on';
+      sfxMuteBtn.classList.toggle('muted', m);
+      sfxMuteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
+    }
+    syncMuteButton();
+    sfxMuteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      Sfx.toggleMuted();
+      syncMuteButton();
+    });
+
+    function openGameMenu() {
+      gameMenu?.classList.add('visible');
+      gameMenu?.setAttribute('aria-hidden', 'false');
+      gameMenuOpenBtn?.setAttribute('aria-expanded', 'true');
+      gameMenuCloseBtn?.focus({ preventScroll: true });
+    }
+    function closeGameMenu() {
+      gameMenu?.classList.remove('visible');
+      gameMenu?.setAttribute('aria-hidden', 'true');
+      gameMenuOpenBtn?.setAttribute('aria-expanded', 'false');
+    }
+    gameMenuOpenBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      Sfx.resume();
+      openGameMenu();
+    });
+    gameMenuCloseBtn?.addEventListener('click', () => closeGameMenu());
+    gameMenu?.addEventListener('click', (e) => {
+      if (e.target === gameMenu) closeGameMenu();
+    });
 
     const TOTAL_ELEMENTS = FRUITS.length;
     /** @type {number[]} atomic numbers first unlocked ever during this run */
@@ -873,16 +1006,17 @@
     discOpenBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       Sfx.resume();
+      closeGameMenu();
       openDiscovery();
     });
     discCloseBtn?.addEventListener('click', () => closeDiscovery());
     discoveryOverlay?.addEventListener('click', (e) => {
       if (e.target === discoveryOverlay) closeDiscovery();
     });
-    helpDiscLink?.addEventListener('click', (e) => {
+    helpMenuLink?.addEventListener('click', (e) => {
       e.preventDefault();
       Sfx.resume();
-      openDiscovery();
+      openGameMenu();
     });
 
     /**
@@ -1234,6 +1368,11 @@
       g.addColorStop(1, `#${lo.getHexString()}`);
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, s, s);
+      drawAtomShells2d(ctx, s / 2, s / 2, spec.atomicNumber ?? 0, {
+        r: Math.round(tc.r * 255),
+        g: Math.round(tc.g * 255),
+        b: Math.round(tc.b * 255),
+      });
       ctx.strokeStyle = 'rgba(255,255,255,0.14)';
       ctx.lineWidth = 3;
       ctx.beginPath();

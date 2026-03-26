@@ -1,9 +1,18 @@
 /**
  * Procedural Web Audio — pitch/volume scale with combo for merges.
  */
+const MUTE_STORAGE_KEY = 'mergeGameSfxMuted';
+
 export function createSfx() {
   let ctx = null;
   let master = null;
+  let muted = false;
+
+  try {
+    muted = localStorage.getItem(MUTE_STORAGE_KEY) === '1';
+  } catch (_) {
+    muted = false;
+  }
 
   function get() {
     if (!ctx) {
@@ -11,7 +20,7 @@ export function createSfx() {
       if (!AC) return null;
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = 0.96;
+      master.gain.value = muted ? 0 : 0.96;
       master.connect(ctx.destination);
     }
     return ctx;
@@ -23,6 +32,7 @@ export function createSfx() {
   }
 
   function beep(freq, dur, delay, type = 'sine', vol = 0.55) {
+    if (muted) return;
     const c = get();
     if (!c) return;
     const t = c.currentTime + delay;
@@ -41,11 +51,27 @@ export function createSfx() {
 
   return {
     resume,
+    getMuted() {
+      return muted;
+    },
+    setMuted(m) {
+      muted = !!m;
+      try {
+        localStorage.setItem(MUTE_STORAGE_KEY, muted ? '1' : '0');
+      } catch (_) {}
+      if (master) master.gain.value = muted ? 0 : 0.96;
+    },
+    toggleMuted() {
+      const next = !muted;
+      this.setMuted(next);
+      return next;
+    },
     /**
      * Light “whoosh slide” in the mid band only — no sub-bass tail (avoids boom/thump).
      * Quiet filtered noise + soft sine glide reads like friction/slip, not an impact.
      */
     playDrop() {
+      if (muted) return;
       const c = get();
       if (!c) return;
       resume();
@@ -92,6 +118,7 @@ export function createSfx() {
     },
     /** comboMult drives pitch + volume harder so chains feel “hot” */
     playMerge(newType, comboMult = 1) {
+      if (muted) return;
       const c = get();
       if (!c) return;
       resume();
@@ -104,6 +131,7 @@ export function createSfx() {
     },
     /** heat 1+ scales jackpot sting (combo chain) */
     playJackpot(heat = 1) {
+      if (muted) return;
       resume();
       const h = Math.min(2.2, Math.max(1, heat));
       const v = (x) => Math.min(0.88, x * (0.82 + h * 0.12));
@@ -114,6 +142,7 @@ export function createSfx() {
     },
     /** Low “heartbeat” when pile stress is high — stress 0..1 sets loudness */
     playHeartbeat(stress = 0.6) {
+      if (muted) return;
       const c = get();
       if (!c) return;
       resume();
@@ -133,12 +162,14 @@ export function createSfx() {
       osc.stop(t + 0.24);
     },
     playGameOver() {
+      if (muted) return;
       resume();
       beep(349, 0.14, 0, 'triangle', 0.52);
       beep(262, 0.18, 0.11, 'triangle', 0.46);
       beep(196, 0.26, 0.26, 'sine', 0.4);
     },
     playLevelUp() {
+      if (muted) return;
       resume();
       beep(523, 0.07, 0, 'sine', 0.46);
       beep(659, 0.09, 0.07, 'sine', 0.42);

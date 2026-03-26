@@ -2,6 +2,8 @@
  * 2D element sphere face — matches atoms-merge elementFaceMap layout without Three.js.
  */
 
+import { drawAtomShells2d } from './atom-shells.js';
+
 function clampByte(n) {
   return Math.max(0, Math.min(255, Math.round(n)));
 }
@@ -48,6 +50,7 @@ export function drawElementFace2d(ctx, size, spec) {
   g.addColorStop(1, rgbStr(lo));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
+  drawAtomShells2d(ctx, s / 2, s / 2, spec.atomicNumber ?? 0, mid);
   ctx.strokeStyle = 'rgba(255,255,255,0.14)';
   ctx.lineWidth = Math.max(1, s * 0.012);
   ctx.beginPath();

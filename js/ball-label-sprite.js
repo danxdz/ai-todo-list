@@ -19,8 +19,8 @@ export function createElementSymbolSprite(spec) {
   const tex = makeCanvasTexture((ctx, s) => {
     ctx.clearRect(0, 0, s, s);
     const sym = spec.symbol || '?';
-    ctx.shadowColor = 'rgba(0,0,0,0.75)';
-    ctx.shadowBlur = s * 0.06;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = s * 0.035;
     ctx.fillStyle = '#ffffff';
     const fs = sym.length > 2 ? s * 0.28 : s * 0.38;
     ctx.font = `800 ${fs}px system-ui, "Segoe UI", sans-serif`;
@@ -37,14 +37,15 @@ export function createElementSymbolSprite(spec) {
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
-    depthTest: false,
+    /** Occlude with other balls so labels don’t look like floating HUD stickers */
+    depthTest: true,
     depthWrite: false,
     /** Orthographic + fixed screen size; avoids sprite scale fighting perspective heuristics */
     sizeAttenuation: false,
   });
   const spr = new THREE.Sprite(mat);
   spr.scale.setScalar(1);
-  spr.renderOrder = 999;
+  spr.renderOrder = 12;
   return spr;
 }
 
@@ -90,7 +91,7 @@ export function updateLabelBillboard(sprite, camera) {
 
 /** World scale for sprite so it reads ~right on sphere radius r */
 export function setElementLabelScale(sprite, radius) {
-  const w = radius * 1.55;
+  const w = radius * 1.22;
   sprite.scale.set(w, w, w);
 }
 
@@ -102,7 +103,7 @@ export function setNumberLabelScale(sprite, radius) {
 
 /** Push digit slightly in front of sphere toward camera (+Z in local space; camera looks from +Z). */
 export function placeDigitInFrontOfSphere(label, radius) {
-  label.position.set(0, 0, radius * 1.06);
+  label.position.set(0, 0, radius * 1.018);
 }
 
 /**

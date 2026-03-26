@@ -451,6 +451,7 @@
     import { applyStudioEnvironment } from './js/environment.js';
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
     import { createPlayfieldCup, applyMergeOrthoCameraPose } from './js/playfield-cup.js';
+    import { syncHudMenuToPlayfieldRight } from './js/hud-playfield-align.js';
     import { createTryMerge } from './js/merge-engine.js';
     import { massForFruitSpec } from './js/ball-mass.js';
     import { t } from './js/i18n.js';
@@ -469,6 +470,7 @@
     const floatFxEl = document.getElementById('floatFx');
     const overlay = document.getElementById('overlay');
     const overlayRestart = document.getElementById('overlayRestart');
+    const hudMenuWrap = document.querySelector('.hud-top-actions');
 
     let score = 0;
     let level = 1;
@@ -1245,8 +1247,13 @@
       }
     });
 
+    function syncHudMenuAlign() {
+      syncHudMenuToPlayfieldRight({ camera, canvasEl, CUP, ROW_Z, menuWrap: hudMenuWrap });
+    }
+
     function onViewportChange() {
       applyCupLayout();
+      syncHudMenuAlign();
       const c = canvasCenterClient();
       updateGhostAt(c.x, c.y);
     }
@@ -1388,6 +1395,7 @@
 
     syncHud();
     applyCupLayout();
+    syncHudMenuAlign();
     syncDropQueuePreviews();
     const c0 = canvasCenterClient();
     updateGhostAt(c0.x, c0.y);

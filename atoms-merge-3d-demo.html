@@ -9,6 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <link rel="icon" href="data:," />
   <title>Periodic Stack — Atomic merge v63</title>
+  <link rel="stylesheet" href="css/merge-game-ui.css" />
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -51,22 +52,7 @@
       transition: opacity 0.14s linear;
       mix-blend-mode: multiply;
     }
-    #hud {
-      position: fixed;
-      right: max(10px, env(safe-area-inset-right, 0px));
-      left: auto;
-      top: max(10px, env(safe-area-inset-top, 0px));
-      z-index: 3;
-      width: min(148px, 38vw);
-      pointer-events: none;
-      text-align: right;
-    }
-    .hud-column {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.55rem;
-    }
+    /* HUD shell: css/merge-game-ui.css */
     .hud-brand {
       font-size: 10px;
       letter-spacing: 0.16em;
@@ -86,12 +72,7 @@
       0%, 100% { filter: drop-shadow(0 0 6px rgba(122, 184, 255, 0.4)); }
       50% { filter: drop-shadow(0 0 12px rgba(160, 210, 255, 0.75)); }
     }
-    .hud-stat {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.12rem;
-    }
+    .merge-game .hud-stat { align-items: flex-start; }
     .hud-label {
       font-size: 9px;
       font-weight: 600;
@@ -279,16 +260,6 @@
       align-items: center;
       gap: 12px;
       pointer-events: auto;
-    }
-    #help {
-      position: fixed;
-      right: max(10px, env(safe-area-inset-right, 0px));
-      bottom: max(10px, env(safe-area-inset-bottom, 0px));
-      z-index: 3;
-      color: #a8b4c8; font-size: clamp(11px, 2.9vw, 13px);
-      max-width: min(240px, 42vw); text-align: right;
-      line-height: 1.4;
-      pointer-events: none;
     }
     canvas { display: block; touch-action: none; }
     .phys-dbg-wrap {
@@ -522,90 +493,7 @@
       font-style: normal;
       font-size: 11px;
     }
-    .hud-menu-btn {
-      pointer-events: auto;
-      margin-top: 0.35rem;
-      padding: 7px 11px;
-      font: inherit;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #e8f4ff;
-      background: rgba(30, 50, 70, 0.75);
-      border: 1px solid rgba(120, 170, 220, 0.35);
-      border-radius: 10px;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    .hud-menu-btn:active { transform: scale(0.97); }
-    .hud-mute-btn {
-      pointer-events: auto;
-      margin-top: 0.35rem;
-      padding: 6px 10px;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: 10px;
-      border: 1px solid rgba(120, 170, 220, 0.35);
-      background: rgba(22, 38, 52, 0.85);
-      color: #c8e4ff;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    .hud-mute-btn.muted { opacity: 0.55; }
-    #gameMenu {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 17;
-      align-items: flex-start;
-      justify-content: flex-end;
-      padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 12px;
-      background: rgba(4, 10, 8, 0.45);
-      backdrop-filter: blur(4px);
-      pointer-events: auto;
-    }
-    #gameMenu.visible { display: flex; }
-    .game-menu-panel {
-      width: min(300px, 88vw);
-      max-height: min(72dvh, 480px);
-      overflow: auto;
-      background: linear-gradient(168deg, rgba(22, 42, 34, 0.98), rgba(10, 22, 16, 0.99));
-      border: 1px solid rgba(100, 200, 150, 0.28);
-      border-radius: 14px;
-      padding: 12px 14px 14px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-    }
-    .game-menu-panel h2 {
-      margin: 0 0 8px;
-      font-size: 0.95rem;
-      color: #d8f5e4;
-    }
-    .game-menu-panel p {
-      margin: 0 0 10px;
-      font-size: 12px;
-      line-height: 1.45;
-      color: rgba(170, 210, 185, 0.88);
-    }
-    .game-menu-panel a {
-      display: block;
-      margin: 6px 0;
-      color: #9ee0c0;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .game-menu-panel a:hover { text-decoration: underline; }
-    .game-menu-close {
-      float: right;
-      width: 34px;
-      height: 34px;
-      border: none;
-      border-radius: 8px;
-      background: rgba(40, 70, 55, 0.7);
-      color: #c8eed8;
-      font-size: 18px;
-      cursor: pointer;
-    }
+    /* Slide menu panel: css/merge-game-ui.css (#gameMenu) — atoms theme vars in .theme-atoms */
   </style>
 </head>
 <body>
@@ -613,77 +501,34 @@
   <div id="confettiHost" aria-hidden="true"></div>
   <div id="floatFx" aria-hidden="true"></div>
   <div id="hud">
-    <div class="hud-column">
-      <div class="hud-brand">Periodic Stack <strong id="buildId">v63</strong></div>
-      <div class="hud-stat">
-        <span class="hud-label">Score</span>
-        <span class="hud-value" id="scoreVal">0</span>
-      </div>
-      <div class="hud-stat">
-        <span class="hud-label">Level</span>
-        <span class="hud-value" id="levelVal">1</span>
-      </div>
-      <div class="hud-stat">
-        <span class="hud-label">Combo</span>
-        <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
-      </div>
-      <div class="hud-sub">Next <span id="nextLvlVal">200</span> pts</div>
-      <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Period 1 · light elements</div>
-      <div class="hud-sub" id="atomFact" style="margin-top:0.35rem;max-width:min(200px,40vw);line-height:1.35;min-height:2.6em"></div>
-      <div class="hud-hint" style="margin-top:0.25rem">
-        <button type="button" class="hud-menu-btn" id="gameMenuOpenBtn" aria-expanded="false" aria-controls="gameMenu">Menu</button>
-        <button type="button" class="hud-mute-btn" id="sfxMuteBtn" aria-pressed="false">Sound on</button>
-      </div>
-    </div>
-  </div>
-  <div id="gameMenu" role="dialog" aria-modal="true" aria-labelledby="gameMenuTitle" aria-hidden="true">
-    <div class="game-menu-panel">
-      <button type="button" class="game-menu-close" id="gameMenuCloseBtn" aria-label="Close menu">×</button>
-      <h2 id="gameMenuTitle">Game</h2>
-      <p>Release to drop · merge same element · twin heaviest = fusion jackpot · spheres show a Bohr-style shell hint (educational).</p>
-      <p><kbd>R</kbd> restart · <kbd>F</kbd> fullscreen · <kbd>D</kbd> physics</p>
-      <button type="button" class="hud-disc-btn" id="discOpenBtn" style="width:100%;margin-bottom:8px">Discovered elements</button>
-      <a href="numbers-merge-3d-demo.html">Number stack</a>
-      <a href="fruit-merge-3d-demo.html">Marble / ceramic stack</a>
-      <a href="index.html">Main menu</a>
-    </div>
-  </div>
-  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle" aria-hidden="true">
-    <div id="overlayTitle">Game over</div>
-    <div id="overlaySub" style="font-size:55%;opacity:.9">Reactor column hit critical fill</div>
-    <div id="overlayDiscover" style="font-size:42%;opacity:.88;max-width:min(340px,88vw);line-height:1.45;margin-top:6px"></div>
-    <div style="font-size:45%;opacity:.75;margin-top:8px">
-      <kbd style="background:#333;padding:4px 8px;border-radius:4px">R</kbd> on keyboard · or tap below
-    </div>
-    <button type="button" id="overlayRestart">Restart</button>
-  </div>
-  <div id="help">
-    <a class="help-link" href="#" id="helpMenuLink">Menu</a> · release to drop
-  </div>
-
-  <div id="discoveryOverlay" role="dialog" aria-modal="true" aria-labelledby="discTitle" aria-hidden="true">
-    <div class="disc-panel">
-      <div class="disc-head">
-        <div>
-          <h2 id="discTitle">Discovered elements</h2>
-          <p>Unlock by dropping or merging — tap a card to read its fact again.</p>
+    <div class="bottom-bar">
+      <div class="hud-stats-row">
+        <div class="hud-column">
+          <div class="hud-brand"><span data-i18n="atoms.title">Periodic stack</span> <strong id="buildId">v63</strong></div>
+          <div class="hud-stat">
+            <span class="hud-label" data-i18n="common.score">Score</span>
+            <span class="hud-value" id="scoreVal">0</span>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label" data-i18n="common.level">Level</span>
+            <span class="hud-value" id="levelVal">1</span>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label" data-i18n="common.combo">Combo</span>
+            <span class="hud-value" id="comboMultVal" style="font-size:clamp(1.1rem,5vw,1.45rem)">—</span>
+          </div>
+          <div class="hud-sub"><span data-i18n="common.nextPts">Next</span> <span id="nextLvlVal">200</span> pts</div>
+          <div class="hud-sub" id="tierHook" style="margin-top:0.2rem">Period 1–3 — Light elements</div>
+          <div class="hud-sub" id="atomFact" style="margin-top:0.35rem;max-width:min(260px,52vw);line-height:1.35;min-height:2.6em"></div>
         </div>
-        <button type="button" class="disc-close" id="discCloseBtn" aria-label="Close">×</button>
       </div>
-      <div class="disc-progress-wrap">
-        <div class="disc-progress-label" id="discProgressLabel">0 / 18 discovered</div>
-        <div class="disc-progress-bar"><div class="disc-progress-fill" id="discProgressFill" style="width:0%"></div></div>
+      <div class="hud-actions">
+        <button type="button" class="hud-menu-btn" id="gameMenuOpenBtn" aria-expanded="false" aria-controls="gameMenu" data-i18n="common.menu">Menu</button>
+        <button type="button" class="hud-mute-btn" id="sfxMuteBtn" aria-pressed="false" data-i18n="common.soundOn">Sound on</button>
       </div>
-      <div class="disc-grid-wrap">
-        <div class="disc-grid" id="discGrid"></div>
-      </div>
-      <div class="disc-detail" id="discDetail"><em>Tap an unlocked element to see its fact.</em></div>
-    </div>
-  </div>
-
-  <div class="phys-dbg-wrap" id="physDbgWrap">
-    <button type="button" class="phys-dbg-tab" id="physDbgTab" aria-expanded="false">Physics debug ▲</button>
-    <div class="phys-dbg-panel" id="physDbgPanel" hidden>
+      <div class="phys-dbg-wrap" id="physDbgWrap">
+        <button type="button" class="phys-dbg-tab" id="physDbgTab" aria-expanded="false">Physics debug ▲</button>
+        <div class="phys-dbg-panel" id="physDbgPanel" hidden>
       <h3>Physics</h3>
       <div class="phys-preset-bar" id="phys-preset-bar">
         <button type="button" class="phys-preset-btn" data-preset="ceramic">Ceramic</button>
@@ -738,6 +583,62 @@
         <input type="range" id="pt-solver" data-key="solverIterations" min="8" max="55" step="1" />
         <span class="phys-val" id="ptv-solverIterations"></span></div>
       </details>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameMenu" role="dialog" aria-modal="true" aria-labelledby="gameMenuTitle" aria-hidden="true">
+    <div class="game-menu-panel">
+      <button type="button" class="game-menu-close" id="gameMenuCloseBtn" data-i18n-aria="common.close">×</button>
+      <h2 id="gameMenuTitle" data-i18n="common.menu">Menu</h2>
+      <p class="menu-muted" data-i18n="common.releaseToDrop">Slide to aim, release to drop.</p>
+      <div class="menu-lang">
+        <label for="langSelect"><span data-i18n="common.language">Language</span></label>
+        <select id="langSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="pt">Português</option>
+        </select>
+      </div>
+      <h3 style="margin:0;font-size:13px;color:rgba(200,235,215,0.95)" data-i18n="common.howToPlay">How to play</h3>
+      <p class="menu-muted" id="gameMenuHowTo"></p>
+      <h3 style="margin:8px 0 0;font-size:13px;color:rgba(200,235,215,0.95)" data-i18n="common.controls">Controls</h3>
+      <p class="menu-muted" id="gameMenuControls"></p>
+      <button type="button" class="hud-disc-btn" id="discOpenBtn" style="width:100%;margin-bottom:8px" data-i18n="atoms.discoveredTitle">Discovered elements</button>
+      <div class="menu-links-row">
+        <a href="numbers-merge-3d-demo.html" data-i18n="common.linkNumbers">Numbers</a>
+        <a href="fruit-merge-3d-demo.html" data-i18n="common.linkMarbles">Marbles</a>
+        <a href="index.html" data-i18n="common.mainMenu">Main menu</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle" aria-hidden="true">
+    <div id="overlayTitle" data-i18n="common.gameOver">Game over</div>
+    <div id="overlaySub" style="font-size:55%;opacity:.9" data-i18n="atoms.overlaySub">Reactor column hit critical fill.</div>
+    <div id="overlayDiscover" style="font-size:42%;opacity:.88;max-width:min(340px,88vw);line-height:1.45;margin-top:6px"></div>
+    <div id="overlayHint" style="font-size:45%;opacity:.75;margin-top:8px" data-i18n="common.overlayHint">Press R on keyboard — or tap below.</div>
+    <button type="button" id="overlayRestart" data-i18n="common.restart">Restart</button>
+  </div>
+
+  <div id="discoveryOverlay" role="dialog" aria-modal="true" aria-labelledby="discTitle" aria-hidden="true">
+    <div class="disc-panel">
+      <div class="disc-head">
+        <div>
+          <h2 id="discTitle" data-i18n="atoms.discoveredTitle">Discovered elements</h2>
+          <p data-i18n="atoms.discoveredSub">Unlock by dropping or merging — tap a card to read its fact again.</p>
+        </div>
+        <button type="button" class="disc-close" id="discCloseBtn" data-i18n-aria="common.close">×</button>
+      </div>
+      <div class="disc-progress-wrap">
+        <div class="disc-progress-label" id="discProgressLabel" data-i18n="atoms.discoveredProgress" data-i18n-found="0" data-i18n-total="18">0 / 18 discovered</div>
+        <div class="disc-progress-bar"><div class="disc-progress-fill" id="discProgressFill" style="width:0%"></div></div>
+      </div>
+      <div class="disc-grid-wrap">
+        <div class="disc-grid" id="discGrid"></div>
+      </div>
+      <div class="disc-detail" id="discDetail"><em data-i18n="atoms.discoveredPlaceholder">Tap an unlocked element to see its fact.</em></div>
     </div>
   </div>
 
@@ -811,6 +712,8 @@
     import { createOrthoViewportLayout } from './js/viewport-ortho.js';
     import { createPlayfieldCup } from './js/playfield-cup.js';
     import { createTryMerge } from './js/merge-engine.js';
+    import { t, applyI18n } from './js/i18n.js';
+    import { initMergeGameShell } from './js/ui-shell.js';
 
     let CUP = { ...CUP_BASE, wallH: 11 };
     /** Drop height (below rim). Lose line must be higher (Y-up): rim at y=wallH */
@@ -835,11 +738,6 @@
     const discProgressFill = document.getElementById('discProgressFill');
     const discDetail = document.getElementById('discDetail');
     const confettiHost = document.getElementById('confettiHost');
-    const helpMenuLink = document.getElementById('helpMenuLink');
-    const gameMenu = document.getElementById('gameMenu');
-    const gameMenuOpenBtn = document.getElementById('gameMenuOpenBtn');
-    const gameMenuCloseBtn = document.getElementById('gameMenuCloseBtn');
-    const sfxMuteBtn = document.getElementById('sfxMuteBtn');
 
     let score = 0;
     let level = 1;
@@ -853,41 +751,7 @@
 
     const Sfx = createSfx();
     document.body.addEventListener('pointerdown', () => Sfx.resume(), { passive: true });
-
-    function syncMuteButton() {
-      if (!sfxMuteBtn) return;
-      const m = Sfx.getMuted();
-      sfxMuteBtn.textContent = m ? 'Sound off' : 'Sound on';
-      sfxMuteBtn.classList.toggle('muted', m);
-      sfxMuteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
-    }
-    syncMuteButton();
-    sfxMuteBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      Sfx.toggleMuted();
-      syncMuteButton();
-    });
-
-    function openGameMenu() {
-      gameMenu?.classList.add('visible');
-      gameMenu?.setAttribute('aria-hidden', 'false');
-      gameMenuOpenBtn?.setAttribute('aria-expanded', 'true');
-      gameMenuCloseBtn?.focus({ preventScroll: true });
-    }
-    function closeGameMenu() {
-      gameMenu?.classList.remove('visible');
-      gameMenu?.setAttribute('aria-hidden', 'true');
-      gameMenuOpenBtn?.setAttribute('aria-expanded', 'false');
-    }
-    gameMenuOpenBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      Sfx.resume();
-      openGameMenu();
-    });
-    gameMenuCloseBtn?.addEventListener('click', () => closeGameMenu());
-    gameMenu?.addEventListener('click', (e) => {
-      if (e.target === gameMenu) closeGameMenu();
-    });
+    const { closeGameMenu } = initMergeGameShell({ themeId: 'atoms', Sfx, showMute: true });
 
     const TOTAL_ELEMENTS = FRUITS.length;
     /** @type {number[]} atomic numbers first unlocked ever during this run */
@@ -922,7 +786,12 @@
 
     function syncDiscoveryProgressUI() {
       const n = discoveredCount();
-      if (discProgressLabel) discProgressLabel.textContent = `${n} / ${TOTAL_ELEMENTS} discovered`;
+      if (discProgressLabel) {
+        discProgressLabel.dataset.i18nFound = String(n);
+        discProgressLabel.dataset.i18nTotal = String(TOTAL_ELEMENTS);
+        discProgressLabel.setAttribute('data-i18n', 'atoms.discoveredProgress');
+        applyI18n(discoveryOverlay ?? document.body);
+      }
       if (discProgressFill) discProgressFill.style.width = `${(n / TOTAL_ELEMENTS) * 100}%`;
     }
 
@@ -966,7 +835,7 @@
         btn.appendChild(symEl);
         btn.addEventListener('click', () => {
           if (!loadDiscoveredAtomicNumbers().has(z)) {
-            if (discDetail) discDetail.innerHTML = '<em>Not discovered yet — merge or drop this element!</em>';
+            if (discDetail) discDetail.innerHTML = `<em>${t('atoms.discoveredLocked')}</em>`;
             return;
           }
           discGrid.querySelectorAll('.disc-card').forEach((c) => c.classList.remove('selected'));
@@ -1022,12 +891,6 @@
     discoveryOverlay?.addEventListener('click', (e) => {
       if (e.target === discoveryOverlay) closeDiscovery();
     });
-    helpMenuLink?.addEventListener('click', (e) => {
-      e.preventDefault();
-      Sfx.resume();
-      openGameMenu();
-    });
-
     /**
      * @param {number} z atomic number
      */
@@ -1074,10 +937,10 @@
     let heartbeatAcc = 0;
 
     function tierLabelForLevel(lv) {
-      if (lv >= 10) return 'Transuranics lab · period VII+';
-      if (lv >= 7) return 'Heavy metals · period VI';
-      if (lv >= 4) return 'Transition block · period IV–V';
-      return 'Period 1–3 · light elements';
+      if (lv >= 10) return t('atoms.tier4');
+      if (lv >= 7) return t('atoms.tier3');
+      if (lv >= 4) return t('atoms.tier2');
+      return t('atoms.tier1');
     }
 
     let atomFactTimer = 0;
@@ -1114,6 +977,8 @@
         }
       }
     }
+
+    window.addEventListener('mergegame:locale', () => syncHud());
 
     function pulseHudValue(el) {
       if (!el) return;

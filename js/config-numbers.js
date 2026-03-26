@@ -47,13 +47,17 @@ export const CUP_BASE = {
   wallT: 0.14,
 };
 
+/** Max tier index in the drop pool when fully unlocked (0 = “1”, …). */
 export const DROP_TYPE_MAX = 4;
+/** Early levels only drop the smallest tiers (0..DROP_START_MAX_INDEX); each level adds one more tier. */
+export const DROP_START_MAX_INDEX = 3;
 export const DROP_COOLDOWN_MS = 420;
 export const GAME_OVER_DWELL_SEC = 0.95;
 
-export const LEVEL_GOAL_START = 300;
-export const LEVEL_GOAL_SCALE = 1.35;
-export const LEVEL_GOAL_ADD = 70;
+/** Softer curve — fewer “impossible” jumps between levels */
+export const LEVEL_GOAL_START = 240;
+export const LEVEL_GOAL_SCALE = 1.22;
+export const LEVEL_GOAL_ADD = 48;
 
 export const COMBO_CHAIN_SEC = 1.9;
 export const COMBO_MAX_MULT = 4;

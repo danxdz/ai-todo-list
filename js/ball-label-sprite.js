@@ -104,3 +104,46 @@ export function setNumberLabelScale(sprite, radius) {
 export function placeDigitInFrontOfSphere(label, radius) {
   label.position.set(0, 0, radius * 1.06);
 }
+
+/**
+ * Flat digit quad — parent under the sphere mesh so it **rotates with the ball**
+ * (unlike THREE.Sprite, which always faces the camera).
+ */
+export function createNumberDigitPlane(spec) {
+  const tex = makeCanvasTexture((ctx, s) => {
+    ctx.clearRect(0, 0, s, s);
+    const numStr = String(spec.number);
+    const numSize = numStr.length >= 2 ? s * 0.36 : s * 0.44;
+    ctx.font = `900 ${numSize}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = s / 2;
+    const cy = s / 2 + s * 0.02;
+    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+    ctx.lineWidth = Math.max(1.5, s * 0.02);
+    ctx.lineJoin = 'round';
+    ctx.strokeText(numStr, cx, cy);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(numStr, cx, cy);
+  });
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 998;
+  return mesh;
+}
+
+export function setNumberPlaneScale(mesh, radius) {
+  const w = radius * 2.05;
+  mesh.scale.set(w, w, w);
+}
+
+export function placeDigitPlaneInFrontOfSphere(mesh, radius) {
+  mesh.position.set(0, 0, radius * 1.06);
+}

@@ -9,6 +9,8 @@
   --hud-accent: #7ab8ff;
   --menu-panel-bg: rgba(14, 16, 28, 0.97);
   --menu-accent: rgba(180, 210, 255, 0.95);
+  /** Must match MERGE_GAME_HUD_BOTTOM_RESERVE_PX in js/viewport-ortho.js */
+  --merge-hud-bottom-reserve: 96px;
 }
 
 .merge-game.theme-marble {
@@ -46,19 +48,21 @@
   pointer-events: auto;
 }
 
-/* Stats: bottom center with padding — full width canvas above */
+/* Stats: sit in reserved bottom strip (canvas height excludes this — see viewport-ortho.js) */
 .merge-game #hud {
   position: fixed;
   left: max(10px, env(safe-area-inset-left, 0px));
   right: max(10px, env(safe-area-inset-right, 0px));
-  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  height: var(--merge-hud-bottom-reserve);
   top: auto;
   z-index: 3;
   pointer-events: none;
   display: flex;
   justify-content: center;
-  align-items: flex-end;
-  padding-bottom: 2px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 6px;
 }
 
 .merge-game .bottom-bar {

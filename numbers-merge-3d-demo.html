@@ -1331,7 +1331,7 @@
     const clock = new THREE.Clock();
     let acc = 0;
     const fixed = 1 / 120;
-    const PHYS_SUBSTEPS = 2;
+    const PHYS_SUBSTEPS = 3;
 
     function tick() {
       requestAnimationFrame(tick);
@@ -1370,6 +1370,13 @@
         }
         f.mesh.position.copy(f.body.position);
         f.ball.quaternion.copy(f.body.quaternion);
+        {
+          const minY = r - 0.02;
+          if (f.body.position.y < minY) {
+            f.body.position.y = minY;
+            f.body.velocity.y = Math.max(0, f.body.velocity.y);
+          }
+        }
 
         if (f.fusionDur != null) {
           f.fusionT += dt;

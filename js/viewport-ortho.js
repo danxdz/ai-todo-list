@@ -18,12 +18,17 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
     orthoMidY: 5,
   };
 
+  /** Space for fixed bottom HUD so the WebGL canvas does not draw under it */
+  const MERGE_GAME_HUD_BOTTOM_RESERVE_PX = 96;
+
   function getViewportSize() {
     const iw = window.innerWidth;
     const ih = window.innerHeight;
     /** Fullscreen + several desktop browsers report bad visualViewport offsets/heights → canvas shifts down and clips */
     if (document.fullscreenElement) {
-      return { width: iw, height: ih, offsetLeft: 0, offsetTop: 0 };
+      const hr =
+        document.body.classList.contains('merge-game') ? MERGE_GAME_HUD_BOTTOM_RESERVE_PX : 0;
+      return { width: iw, height: Math.max(1, ih - hr), offsetLeft: 0, offsetTop: 0 };
     }
     const vv = window.visualViewport;
     if (vv && vv.width > 0 && vv.height > 0) {
@@ -44,9 +49,12 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
         ox = 0;
         oy = 0;
       }
-      return { width: w, height: h, offsetLeft: ox, offsetTop: oy };
+      const hr =
+        document.body.classList.contains('merge-game') ? MERGE_GAME_HUD_BOTTOM_RESERVE_PX : 0;
+      return { width: w, height: Math.max(1, h - hr), offsetLeft: ox, offsetTop: oy };
     }
-    return { width: iw, height: ih, offsetLeft: 0, offsetTop: 0 };
+    const hr = document.body.classList.contains('merge-game') ? MERGE_GAME_HUD_BOTTOM_RESERVE_PX : 0;
+    return { width: iw, height: Math.max(1, ih - hr), offsetLeft: 0, offsetTop: 0 };
   }
 
   function updateCameraFrustum() {

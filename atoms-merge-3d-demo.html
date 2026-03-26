@@ -1386,7 +1386,7 @@
       while (dropQueue.length < 4) dropQueue.push(rollQueuedDropType());
     }
 
-    /** @type {{ mesh: THREE.Mesh, type: number }[]} */
+    /** @type {{ group: THREE.Group, mesh: THREE.Mesh, label?: THREE.Sprite, type: number }[]} */
     const queuePreviewMeshes = [];
 
     const ghostPos = new THREE.Vector3(0, DROP_CENTER_Y, GHOST_Z);
@@ -1402,29 +1402,35 @@
         const existing = queuePreviewMeshes[i];
         if (existing && existing.type === t) continue;
         if (existing) {
-          queuePreviewGroup.remove(existing.mesh);
-          existing.mesh.geometry.dispose();
-          existing.mesh.material.dispose();
+          queuePreviewGroup.remove(existing.group);
+          disposeAtomVisualRoot(existing.group);
         }
         const isAim = i === 0;
-        const rGeom = isAim ? FRUITS[t].radius : FRUITS[t].radius * QUEUE_STRIP_SCALE;
+        const spec = FRUITS[t];
+        const rGeom = isAim ? spec.radius : spec.radius * QUEUE_STRIP_SCALE;
         const geo = new THREE.SphereGeometry(rGeom, isAim ? 28 : 18, isAim ? 20 : 14);
         const mat = makeFruitMaterial(t, { ghost: false });
         mat.depthTest = true;
         if (isAim) mat.depthWrite = true;
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.castShadow = isAim;
-        mesh.receiveShadow = false;
-        mesh.renderOrder = isAim ? 16 : 12;
-        queuePreviewGroup.add(mesh);
-        queuePreviewMeshes[i] = { mesh, type: t };
+        const ball = new THREE.Mesh(geo, mat);
+        ball.castShadow = isAim;
+        ball.receiveShadow = false;
+        ball.renderOrder = isAim ? 16 : 12;
+        const label = createElementSymbolSprite(spec);
+        setElementLabelScale(label, rGeom);
+        placeDigitInFrontOfSphere(label, rGeom);
+        const group = new THREE.Group();
+        group.add(ball);
+        group.add(label);
+        queuePreviewGroup.add(group);
+        queuePreviewMeshes[i] = { group, mesh: ball, label, type: t };
       }
     }
 
     /** [0] at aim; strip stays on inner left — left→right = later → sooner, so [3][2][1] and “next” hugs center. */
     function layoutQueuePreviewMeshes() {
       const active = queuePreviewMeshes[0];
-      if (active && !aimPromoteActive) active.mesh.position.copy(ghostPos);
+      if (active && !aimPromoteActive) active.group.position.copy(ghostPos);
 
       const innerL = -(CUP.halfX - CUP.wallT);
       const inset = 0.06;
@@ -1443,7 +1449,7 @@
         if (!entry) continue;
         const r = entry.mesh.geometry.parameters.radius;
         cx += r;
-        entry.mesh.position.set(cx, yRow, zq);
+        entry.group.position.set(cx, yRow, zq);
         cx += r + QUEUE_STRIP_LANE;
       }
     }
@@ -1475,7 +1481,7 @@
       const c = clampDropXZ(worldX, ROW_Z, spec.radius);
       ghostPos.set(c.x, DROP_CENTER_Y, GHOST_Z);
       const aim = queuePreviewMeshes[0];
-      if (aim && !aimPromoteActive) aim.mesh.position.copy(ghostPos);
+      if (aim && !aimPromoteActive) aim.group.position.copy(ghostPos);
     }
 
     function spawnFruit(type, x, y, z, opts = {}) {
@@ -1642,7 +1648,7 @@
 
       const t = pendingDropType();
       const strip1 = queuePreviewMeshes[1];
-      if (strip1) aimPromoteStart.copy(strip1.mesh.position);
+      if (strip1) aimPromoteStart.copy(strip1.group.position);
       else aimPromoteStart.copy(ghostPos);
 
       const spec = FRUITS[t];
@@ -1657,7 +1663,7 @@
       dropQueue.push(rollQueuedDropType());
       syncDropQueuePreviews();
       const aimAfter = queuePreviewMeshes[0];
-      if (aimAfter) aimAfter.mesh.position.copy(aimPromoteStart);
+      if (aimAfter) aimAfter.group.position.copy(aimPromoteStart);
       aimPromoteElapsed = 0;
       aimPromoteActive = true;
     }
@@ -1758,7 +1764,7 @@
     const clock = new THREE.Clock();
     let acc = 0;
     const fixed = 1 / 120;
-    const PHYS_SUBSTEPS = 2;
+    const PHYS_SUBSTEPS = 3;
 
     function tick() {
       requestAnimationFrame(tick);
@@ -1804,7 +1810,15 @@
           f.body.velocity.x *= -physicsTuning.wallVelRetain;
         }
         f.mesh.position.copy(f.body.position);
+        f.mesh.quaternion.copy(f.body.quaternion);
         updateLabelBillboard(f.label, camera);
+        {
+          const minY = r - 0.02;
+          if (f.body.position.y < minY) {
+            f.body.position.y = minY;
+            f.body.velocity.y = Math.max(0, f.body.velocity.y);
+          }
+        }
 
         if (f.fusionDur != null) {
           f.fusionT += dt;
@@ -1859,7 +1873,7 @@
         aimPromoteElapsed += dt;
         const u = Math.min(1, aimPromoteElapsed / AIM_PROMOTE_SEC);
         const ease = 1 - (1 - u) ** 2;
-        aimLerp.mesh.position.lerpVectors(aimPromoteStart, ghostPos, ease);
+        aimLerp.group.position.lerpVectors(aimPromoteStart, ghostPos, ease);
         if (u >= 1) aimPromoteActive = false;
       }
 

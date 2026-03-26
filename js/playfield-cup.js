@@ -13,8 +13,8 @@ import * as CANNON from 'cannon-es';
  * @param {number} midY — matches orthoLayout.orthoMidY from fitCameraToCup
  */
 export function applyMergeOrthoCameraPose(camera, midY) {
-  const camTiltY = 0.95;
-  const lookYFocus = midY + 0.1;
+  const camTiltY = 1.35;
+  const lookYFocus = midY + 0.28;
   camera.position.set(0, midY - camTiltY, 20.2);
   camera.up.set(0, 1, 0);
   camera.lookAt(0, lookYFocus, 0);
@@ -320,7 +320,8 @@ export function createPlayfieldCup(opts) {
     const hz = CUP.halfZ;
     const wt = CUP.wallT;
     const wh = CUP.wallH;
-    addStaticBox(hx + wt, 0.04, hz + wt, 0, -0.04, 0);
+    /** Thicker floor slab — reduces tunneling at high speed / heavy masses */
+    addStaticBox(hx + wt, 0.14, hz + wt, 0, -0.14, 0);
     addStaticBox(wt / 2, wh / 2, hz + wt, -hx - wt / 2, wh / 2, 0);
     addStaticBox(wt / 2, wh / 2, hz + wt, hx + wt / 2, wh / 2, 0);
     addStaticBox(hx, wh / 2, wt / 2, 0, wh / 2, -hz - wt / 2);

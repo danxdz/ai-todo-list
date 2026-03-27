@@ -1,0 +1,1 @@
+export type GameMode = 'fruit' | 'atoms' | 'numbers';

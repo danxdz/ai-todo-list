@@ -1,0 +1,45 @@
+{
+  "name": "physics-stack-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "release:check": "npm run check && npm run build",
+    "cap:add:android": "cap add android",
+    "cap:add:ios": "cap add ios",
+    "cap:sync": "cap sync",
+    "cap:sync:android": "cap sync android",
+    "cap:sync:ios": "cap sync ios",
+    "cap:doctor": "cap doctor",
+    "release:android": "npm run release:check && npm run cap:sync:android",
+    "release:ios": "npm run release:check && npm run cap:sync:ios",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^25.5.0",
+    "autoprefixer": "^10.4.27",
+    "lucide-svelte": "^1.0.1",
+    "postcss": "^8.5.8",
+    "svelte": "^5.55.0",
+    "svelte-check": "^4.4.5",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
+    "cannon-es": "^0.20.0",
+    "three": "^0.183.2"
+  }
+}

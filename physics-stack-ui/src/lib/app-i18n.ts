@@ -1,0 +1,544 @@
+import { get, writable } from 'svelte/store';
+
+export type Locale = 'en' | 'fr' | 'pt';
+
+const STORAGE_KEY = 'mergeGameLocale';
+const SUPPORTED: Locale[] = ['en', 'fr', 'pt'];
+
+type CopyTable = Record<Locale, Record<string, string>>;
+
+const STRINGS: CopyTable = {
+  en: {
+    'common.back': 'Back',
+    'common.exit': 'Exit',
+    'common.menu': 'Menu',
+    'common.close': 'Close',
+    'common.resume': 'Resume',
+    'common.restart': 'Restart',
+    'common.playNow': 'Play',
+    'common.playAgain': 'Play again',
+    'common.returnHome': 'Home',
+    'common.score': 'Score',
+    'common.level': 'Level',
+    'common.goal': 'Goal',
+    'common.combo': 'Combo',
+    'common.nextDrop': 'Next',
+    'common.language': 'Language',
+    'common.preview': 'Preview',
+    'common.muted': 'Muted',
+    'common.sound': 'Sound',
+    'common.soundOn': 'Sound on',
+    'common.soundOff': 'Sound off',
+    'common.options': 'Options',
+    'common.elements': 'Elements',
+    'common.molecules': 'Molecules',
+    'common.unlocked': 'Unlocked',
+    'common.complete': 'complete',
+    'common.day': 'Day {day}',
+    'common.claimed': 'Claimed',
+    'common.available': 'Available',
+    'home.title': 'Periodic Stack',
+    'home.subtitle': 'Atoms mode first. Shared core for web, Android, and iOS.',
+    'home.playSelected': 'Play {mode}',
+    'home.collection': 'Album',
+    'home.daily': 'Daily',
+    'home.shop': 'Shop',
+    'home.modesTitle': 'Pick a mode',
+    'home.optionsTitle': 'Options',
+    'home.optionsBody': 'Language changes the whole UI and the live game text.',
+    'home.collectionTitle': 'Element album',
+    'home.collectionBody': 'Track atom discoveries from the shared runtime.',
+    'home.dailyTitle': 'Daily rewards',
+    'home.dailyBody': 'Short, clear retention loop built for phone sessions.',
+    'home.shopTitle': 'Shop',
+    'home.shopBody': 'Cosmetic layer only. Mechanics stay shared everywhere.',
+    'mode.fruit.title': 'Fruit Splash',
+    'mode.fruit.tag': 'Fast arcade',
+    'mode.fruit.desc': 'Quick merges, juicy feedback, easy-to-read chaos.',
+    'mode.fruit.bullet1': 'snappy rounds',
+    'mode.fruit.bullet2': 'bright feedback',
+    'mode.fruit.bullet3': 'clean combos',
+    'mode.fruit.tier.warmup': 'Warm-up tier',
+    'mode.fruit.tier.turbo': 'Turbo tier',
+    'mode.fruit.tier.meteor': 'Meteor tier',
+    'mode.fruit.tier.crown': 'Crown tier',
+    'mode.fruit.jackpot': 'Star burst +{points}',
+    'mode.fruit.mergeToast': '{label} merge locked in',
+    'mode.numbers.title': 'Number Rush',
+    'mode.numbers.tag': 'Smart loop',
+    'mode.numbers.desc': 'Readable stacking with a stronger progression curve.',
+    'mode.numbers.bullet1': 'clear labels',
+    'mode.numbers.bullet2': 'clean pacing',
+    'mode.numbers.bullet3': 'simple goals',
+    'mode.numbers.wave': 'Wave {level}',
+    'mode.numbers.jackpot': 'Perfect pair +{points}',
+    'mode.atoms.title': 'Atom Reactor',
+    'mode.atoms.tag': 'Collector mode',
+    'mode.atoms.desc': 'The same gameplay core, skinned as a science discovery loop.',
+    'mode.atoms.bullet1': 'element unlocks',
+    'mode.atoms.bullet2': 'real atom palette',
+    'mode.atoms.bullet3': 'collection hook',
+    'mode.atoms.tier.discovery': 'Discovery run',
+    'mode.atoms.tier.growth': 'Lab growth',
+    'mode.atoms.tier.fusion': 'Fusion wave',
+    'mode.atoms.tier.apex': 'Reactor apex',
+    'mode.atoms.jackpot': 'Fusion +{points}',
+    'game.startHint': 'Drag to aim. Release to drop.',
+    'game.paused': 'Paused',
+    'game.menuSummary': 'Score {score}. Level {level}. Combo {combo}.',
+    'game.ended': 'Run ended',
+    'game.endedSummary': 'Score {score} at level {level}. {summary}',
+    'game.comboReady': 'Ready',
+    'game.levelUnlocked': 'Level {level} unlocked',
+    'game.jackpotMerge': 'Jackpot merge',
+    'game.moleculeUnlocked': 'New molecule: {formula}',
+    'game.newElement': 'New element: {symbol}',
+    'game.elementsDiscovered': '{count} elements discovered',
+    'game.comboPeak': 'Best chain: {count}',
+    'album.eyebrow': 'Collection',
+    'album.title': 'Element Album',
+    'album.subtitle': 'Every atom you unlock lands here automatically.',
+    'album.moleculesTitle': 'Molecule fusion log',
+    'album.play': 'Play atoms',
+    'album.locked': 'Discover this element in Atom Reactor to reveal its card.',
+    'album.moleculeLocked': 'Fuse this molecule in Atom Reactor to unlock its card.',
+    'daily.eyebrow': 'Daily loop',
+    'daily.title': 'Daily Rewards',
+    'daily.subtitle': 'One reward track shared across web, Android, and iOS.',
+    'daily.currentStreak': 'Current streak',
+    'daily.days': '{count} days',
+    'daily.claimedToday': 'Today is already claimed.',
+    'daily.claimPrompt': 'Claim today before your next run.',
+    'daily.claimToday': 'Claim day {day}',
+    'daily.claimedButton': 'Claimed today',
+    'daily.availableLoop': 'Available in the streak loop',
+    'daily.reward1': '100 soft coins',
+    'daily.reward2': 'Queue saver',
+    'daily.reward3': '200 soft coins',
+    'daily.reward4': 'Rare drop boost',
+    'daily.reward5': 'Golden theme shard',
+    'daily.reward6': '300 soft coins',
+    'daily.reward7': 'Legendary skin token',
+    'shop.eyebrow': 'Shop',
+    'shop.title': 'Shop',
+    'shop.subtitle': 'Store-ready framing without mixing platform code into gameplay.',
+    'shop.offer': 'Store-ready offer',
+    'shop.item1.name': 'Starter Burst Pack',
+    'shop.item1.detail': 'Soft currency, retry tokens, and one premium home screen badge.',
+    'shop.item2.name': 'Neon Reactor Theme',
+    'shop.item2.detail': 'A visual skin layer only, so the gameplay core stays identical everywhere.',
+    'shop.item3.name': 'No Ads Upgrade',
+    'shop.item3.detail': 'Simple one-time unlock with a clean value proposition for mobile stores.',
+  },
+  fr: {
+    'common.back': 'Retour',
+    'common.exit': 'Quitter',
+    'common.menu': 'Menu',
+    'common.close': 'Fermer',
+    'common.resume': 'Reprendre',
+    'common.restart': 'Relancer',
+    'common.playNow': 'Jouer',
+    'common.playAgain': 'Rejouer',
+    'common.returnHome': 'Accueil',
+    'common.score': 'Score',
+    'common.level': 'Niveau',
+    'common.goal': 'Objectif',
+    'common.combo': 'Combo',
+    'common.nextDrop': 'Suivant',
+    'common.language': 'Langue',
+    'common.preview': 'Apercu',
+    'common.muted': 'Muet',
+    'common.sound': 'Son',
+    'common.soundOn': 'Son on',
+    'common.soundOff': 'Son off',
+    'common.options': 'Options',
+    'common.elements': 'Elements',
+    'common.molecules': 'Molecules',
+    'common.unlocked': 'Debloques',
+    'common.complete': 'complete',
+    'common.day': 'Jour {day}',
+    'common.claimed': 'Recupere',
+    'common.available': 'Disponible',
+    'home.title': 'Periodic Stack',
+    'home.subtitle': 'Mode atomes en premier. Coeur partage web, Android et iOS.',
+    'home.playSelected': 'Jouer {mode}',
+    'home.collection': 'Album',
+    'home.daily': 'Quotidien',
+    'home.shop': 'Boutique',
+    'home.modesTitle': 'Choisir un mode',
+    'home.optionsTitle': 'Options',
+    'home.optionsBody': 'La langue change toute l interface et les textes du jeu.',
+    'home.collectionTitle': 'Album des elements',
+    'home.collectionBody': 'Suivez les decouvertes des atomes depuis le runtime partage.',
+    'home.dailyTitle': 'Recompenses du jour',
+    'home.dailyBody': 'Boucle courte et lisible pour les sessions telephone.',
+    'home.shopTitle': 'Boutique',
+    'home.shopBody': 'Couche cosmetique seulement. La mecanique reste unique partout.',
+    'mode.fruit.title': 'Fruit Splash',
+    'mode.fruit.tag': 'Arcade rapide',
+    'mode.fruit.desc': 'Fusions rapides, feedback juteux, chaos lisible.',
+    'mode.fruit.bullet1': 'parties vives',
+    'mode.fruit.bullet2': 'feedback clair',
+    'mode.fruit.bullet3': 'combos nets',
+    'mode.fruit.tier.warmup': 'Palier debut',
+    'mode.fruit.tier.turbo': 'Palier turbo',
+    'mode.fruit.tier.meteor': 'Palier meteor',
+    'mode.fruit.tier.crown': 'Palier couronne',
+    'mode.fruit.jackpot': 'Explosion +{points}',
+    'mode.fruit.mergeToast': 'Fusion {label} validee',
+    'mode.numbers.title': 'Number Rush',
+    'mode.numbers.tag': 'Boucle maline',
+    'mode.numbers.desc': 'Empilement lisible avec une progression plus propre.',
+    'mode.numbers.bullet1': 'labels clairs',
+    'mode.numbers.bullet2': 'bon rythme',
+    'mode.numbers.bullet3': 'objectifs simples',
+    'mode.numbers.wave': 'Vague {level}',
+    'mode.numbers.jackpot': 'Paire parfaite +{points}',
+    'mode.atoms.title': 'Atom Reactor',
+    'mode.atoms.tag': 'Mode collection',
+    'mode.atoms.desc': 'Le meme coeur de jeu, habille en boucle de decouverte scientifique.',
+    'mode.atoms.bullet1': 'elements a debloquer',
+    'mode.atoms.bullet2': 'palette atomique',
+    'mode.atoms.bullet3': 'hook collection',
+    'mode.atoms.tier.discovery': 'Run decouverte',
+    'mode.atoms.tier.growth': 'Croissance labo',
+    'mode.atoms.tier.fusion': 'Vague fusion',
+    'mode.atoms.tier.apex': 'Apex reacteur',
+    'mode.atoms.jackpot': 'Fusion +{points}',
+    'game.startHint': 'Glisse pour viser. Relache pour lancer.',
+    'game.paused': 'Pause',
+    'game.menuSummary': 'Score {score}. Niveau {level}. Combo {combo}.',
+    'game.ended': 'Partie finie',
+    'game.endedSummary': 'Score {score} au niveau {level}. {summary}',
+    'game.comboReady': 'Pret',
+    'game.levelUnlocked': 'Niveau {level} debloque',
+    'game.jackpotMerge': 'Fusion jackpot',
+    'game.moleculeUnlocked': 'Nouvelle molecule : {formula}',
+    'game.newElement': 'Nouvel element : {symbol}',
+    'game.elementsDiscovered': '{count} elements decouverts',
+    'game.comboPeak': 'Meilleure chaine : {count}',
+    'album.eyebrow': 'Collection',
+    'album.title': 'Album des elements',
+    'album.subtitle': 'Chaque atome debloque arrive ici automatiquement.',
+    'album.moleculesTitle': 'Journal des fusions de molecules',
+    'album.play': 'Jouer atomes',
+    'album.locked': 'Decouvre cet element dans Atom Reactor pour reveler sa carte.',
+    'album.moleculeLocked': 'Fusionne cette molecule dans Atom Reactor pour reveler sa carte.',
+    'daily.eyebrow': 'Boucle du jour',
+    'daily.title': 'Recompenses du jour',
+    'daily.subtitle': 'Une piste de recompenses partagee entre web, Android et iOS.',
+    'daily.currentStreak': 'Serie actuelle',
+    'daily.days': '{count} jours',
+    'daily.claimedToday': 'Le jour est deja recupere.',
+    'daily.claimPrompt': 'Recupere le bonus avant la prochaine partie.',
+    'daily.claimToday': 'Recuperer jour {day}',
+    'daily.claimedButton': 'Deja recupere',
+    'daily.availableLoop': 'Disponible dans la boucle de serie',
+    'daily.reward1': '100 pieces douces',
+    'daily.reward2': 'Sauvetage de file',
+    'daily.reward3': '200 pieces douces',
+    'daily.reward4': 'Boost de drop rare',
+    'daily.reward5': 'Eclat de theme dore',
+    'daily.reward6': '300 pieces douces',
+    'daily.reward7': 'Jeton de skin legendaire',
+    'shop.eyebrow': 'Boutique',
+    'shop.title': 'Boutique',
+    'shop.subtitle': 'Presentation prete pour le store sans melanger le code plateforme au gameplay.',
+    'shop.offer': 'Offre prete pour store',
+    'shop.item1.name': 'Pack depart Burst',
+    'shop.item1.detail': 'Monnaie douce, jetons de reprise et un badge premium pour l accueil.',
+    'shop.item2.name': 'Theme Reactor Neon',
+    'shop.item2.detail': 'Couche visuelle seulement, le coeur du gameplay reste identique partout.',
+    'shop.item3.name': 'Upgrade sans pub',
+    'shop.item3.detail': 'Achat unique simple avec une proposition claire pour les stores mobiles.',
+  },
+  pt: {
+    'common.back': 'Voltar',
+    'common.exit': 'Sair',
+    'common.menu': 'Menu',
+    'common.close': 'Fechar',
+    'common.resume': 'Retomar',
+    'common.restart': 'Reiniciar',
+    'common.playNow': 'Jogar',
+    'common.playAgain': 'Jogar de novo',
+    'common.returnHome': 'Inicio',
+    'common.score': 'Pontos',
+    'common.level': 'Nivel',
+    'common.goal': 'Meta',
+    'common.combo': 'Combo',
+    'common.nextDrop': 'Proximo',
+    'common.language': 'Idioma',
+    'common.preview': 'Ver',
+    'common.muted': 'Mudo',
+    'common.sound': 'Som',
+    'common.soundOn': 'Som ligado',
+    'common.soundOff': 'Som desligado',
+    'common.options': 'Opcoes',
+    'common.elements': 'Elementos',
+    'common.molecules': 'Moleculas',
+    'common.unlocked': 'Liberados',
+    'common.complete': 'completo',
+    'common.day': 'Dia {day}',
+    'common.claimed': 'Recebido',
+    'common.available': 'Disponivel',
+    'home.title': 'Periodic Stack',
+    'home.subtitle': 'Modo atomos em primeiro. Nucleo compartilhado para web, Android e iOS.',
+    'home.playSelected': 'Jogar {mode}',
+    'home.collection': 'Album',
+    'home.daily': 'Diario',
+    'home.shop': 'Loja',
+    'home.modesTitle': 'Escolha um modo',
+    'home.optionsTitle': 'Opcoes',
+    'home.optionsBody': 'O idioma muda toda a interface e os textos do jogo.',
+    'home.collectionTitle': 'Album de elementos',
+    'home.collectionBody': 'Acompanhe as descobertas dos atomos no runtime compartilhado.',
+    'home.dailyTitle': 'Recompensas diarias',
+    'home.dailyBody': 'Loop curto e claro para sessoes rapidas no telefone.',
+    'home.shopTitle': 'Loja',
+    'home.shopBody': 'Camada cosmetica apenas. A mecanica continua igual em todo lugar.',
+    'mode.fruit.title': 'Fruit Splash',
+    'mode.fruit.tag': 'Arcade rapido',
+    'mode.fruit.desc': 'Combines rapidos, feedback forte e caos facil de ler.',
+    'mode.fruit.bullet1': 'partidas curtas',
+    'mode.fruit.bullet2': 'feedback claro',
+    'mode.fruit.bullet3': 'combos limpos',
+    'mode.fruit.tier.warmup': 'Faixa inicial',
+    'mode.fruit.tier.turbo': 'Faixa turbo',
+    'mode.fruit.tier.meteor': 'Faixa meteoro',
+    'mode.fruit.tier.crown': 'Faixa coroa',
+    'mode.fruit.jackpot': 'Explosao +{points}',
+    'mode.fruit.mergeToast': 'Merge de {label} concluido',
+    'mode.numbers.title': 'Number Rush',
+    'mode.numbers.tag': 'Loop esperto',
+    'mode.numbers.desc': 'Empilhamento legivel com progressao mais consistente.',
+    'mode.numbers.bullet1': 'labels claros',
+    'mode.numbers.bullet2': 'bom ritmo',
+    'mode.numbers.bullet3': 'metas simples',
+    'mode.numbers.wave': 'Onda {level}',
+    'mode.numbers.jackpot': 'Par perfeito +{points}',
+    'mode.atoms.title': 'Atom Reactor',
+    'mode.atoms.tag': 'Modo colecao',
+    'mode.atoms.desc': 'O mesmo nucleo de jogo, agora com pele de descoberta cientifica.',
+    'mode.atoms.bullet1': 'elementos novos',
+    'mode.atoms.bullet2': 'cores atomicas',
+    'mode.atoms.bullet3': 'hook de colecao',
+    'mode.atoms.tier.discovery': 'Rodada descoberta',
+    'mode.atoms.tier.growth': 'Crescimento do lab',
+    'mode.atoms.tier.fusion': 'Onda de fusao',
+    'mode.atoms.tier.apex': 'Apex do reator',
+    'mode.atoms.jackpot': 'Fusao +{points}',
+    'game.startHint': 'Arraste para mirar. Solte para jogar.',
+    'game.paused': 'Pausado',
+    'game.menuSummary': 'Pontos {score}. Nivel {level}. Combo {combo}.',
+    'game.ended': 'Partida encerrada',
+    'game.endedSummary': 'Pontos {score} no nivel {level}. {summary}',
+    'game.comboReady': 'Pronto',
+    'game.levelUnlocked': 'Nivel {level} liberado',
+    'game.jackpotMerge': 'Merge jackpot',
+    'game.moleculeUnlocked': 'Nova molecula: {formula}',
+    'game.newElement': 'Novo elemento: {symbol}',
+    'game.elementsDiscovered': '{count} elementos descobertos',
+    'game.comboPeak': 'Melhor cadeia: {count}',
+    'album.eyebrow': 'Colecao',
+    'album.title': 'Album de elementos',
+    'album.subtitle': 'Cada atomo desbloqueado entra aqui automaticamente.',
+    'album.moleculesTitle': 'Registro de fusao de moleculas',
+    'album.play': 'Jogar atomos',
+    'album.locked': 'Descubra este elemento em Atom Reactor para revelar a carta.',
+    'album.moleculeLocked': 'Funda esta molecula em Atom Reactor para liberar a carta.',
+    'daily.eyebrow': 'Loop diario',
+    'daily.title': 'Recompensas diarias',
+    'daily.subtitle': 'Uma trilha de recompensas compartilhada entre web, Android e iOS.',
+    'daily.currentStreak': 'Sequencia atual',
+    'daily.days': '{count} dias',
+    'daily.claimedToday': 'O dia de hoje ja foi recebido.',
+    'daily.claimPrompt': 'Receba hoje antes da proxima partida.',
+    'daily.claimToday': 'Receber dia {day}',
+    'daily.claimedButton': 'Recebido hoje',
+    'daily.availableLoop': 'Disponivel no loop de sequencia',
+    'daily.reward1': '100 moedas leves',
+    'daily.reward2': 'Salva fila',
+    'daily.reward3': '200 moedas leves',
+    'daily.reward4': 'Boost de drop raro',
+    'daily.reward5': 'Fragmento de tema dourado',
+    'daily.reward6': '300 moedas leves',
+    'daily.reward7': 'Token de skin lendaria',
+    'shop.eyebrow': 'Loja',
+    'shop.title': 'Loja',
+    'shop.subtitle': 'Estrutura pronta para store sem misturar codigo de plataforma com gameplay.',
+    'shop.offer': 'Oferta pronta para store',
+    'shop.item1.name': 'Pacote Burst Inicial',
+    'shop.item1.detail': 'Moeda leve, tokens de tentativa e um badge premium para a tela inicial.',
+    'shop.item2.name': 'Tema Reator Neon',
+    'shop.item2.detail': 'Apenas camada visual, o nucleo do gameplay continua igual em todo lugar.',
+    'shop.item3.name': 'Upgrade sem anuncios',
+    'shop.item3.detail': 'Compra unica simples com proposta clara para lojas mobile.',
+  },
+};
+
+const FRUIT_LABELS: Record<Locale, string[]> = {
+  en: ['Cherry', 'Lemon', 'Berry', 'Orange', 'Plum', 'Melon', 'Coconut'],
+  fr: ['Cerise', 'Citron', 'Baie', 'Orange', 'Prune', 'Melon', 'Noix de coco'],
+  pt: ['Cereja', 'Limao', 'Baga', 'Laranja', 'Ameixa', 'Melao', 'Coco'],
+};
+
+const NUMBER_FACTS: Record<Locale, Record<number, string>> = {
+  en: { 1: 'One!', 2: 'Two!', 3: 'Three!', 4: 'Four!', 5: 'Five!', 6: 'Six!', 7: 'Seven!', 8: 'Eight!', 9: 'Nine!', 10: 'Ten!', 11: 'Eleven!', 12: 'Twelve!' },
+  fr: { 1: 'Un !', 2: 'Deux !', 3: 'Trois !', 4: 'Quatre !', 5: 'Cinq !', 6: 'Six !', 7: 'Sept !', 8: 'Huit !', 9: 'Neuf !', 10: 'Dix !', 11: 'Onze !', 12: 'Douze !' },
+  pt: { 1: 'Um!', 2: 'Dois!', 3: 'Tres!', 4: 'Quatro!', 5: 'Cinco!', 6: 'Seis!', 7: 'Sete!', 8: 'Oito!', 9: 'Nove!', 10: 'Dez!', 11: 'Onze!', 12: 'Doze!' },
+};
+
+const ATOM_COPY: Record<Locale, Record<string, { name: string; fact: string }>> = {
+  en: {
+    H: { name: 'Hydrogen', fact: 'The most common element in the universe.' },
+    He: { name: 'Helium', fact: 'It makes balloons float.' },
+    Li: { name: 'Lithium', fact: 'Used in phone and EV batteries.' },
+    Be: { name: 'Beryllium', fact: 'Very light and very stiff.' },
+    B: { name: 'Boron', fact: 'Helps make heat-resistant glass.' },
+    C: { name: 'Carbon', fact: 'The backbone of life, graphite, and diamonds.' },
+    N: { name: 'Nitrogen', fact: 'Most of the air around us is nitrogen.' },
+    O: { name: 'Oxygen', fact: 'Essential for breathing and burning.' },
+    F: { name: 'Fluorine', fact: 'A super reactive element used in toothpaste chemistry.' },
+    Ne: { name: 'Neon', fact: 'Famous for glowing signs.' },
+    Na: { name: 'Sodium', fact: 'Part of table salt and very reactive with water.' },
+    Mg: { name: 'Magnesium', fact: 'Burns with a bright white flame.' },
+    Al: { name: 'Aluminium', fact: 'A light metal used in cans and aircraft.' },
+    Si: { name: 'Silicon', fact: 'Found in chips, glass, and sand.' },
+    P: { name: 'Phosphorus', fact: 'Important for fertilizer and biology.' },
+    S: { name: 'Sulfur', fact: 'Known for its strong smell in some compounds.' },
+    Cl: { name: 'Chlorine', fact: 'Used to disinfect pools and water.' },
+    Ar: { name: 'Argon', fact: 'A calm gas often used in light bulbs.' },
+  },
+  fr: {
+    H: { name: 'Hydrogene', fact: 'Element le plus courant de l univers.' },
+    He: { name: 'Helium', fact: 'Il fait flotter les ballons.' },
+    Li: { name: 'Lithium', fact: 'Utilise dans les batteries de telephones et de voitures.' },
+    Be: { name: 'Beryllium', fact: 'Tres leger et tres rigide.' },
+    B: { name: 'Bore', fact: 'Aide a fabriquer du verre resistant a la chaleur.' },
+    C: { name: 'Carbone', fact: 'Base du vivant, du graphite et du diamant.' },
+    N: { name: 'Azote', fact: 'La plus grande partie de l air est de l azote.' },
+    O: { name: 'Oxygene', fact: 'Necessaire pour respirer et pour la combustion.' },
+    F: { name: 'Fluor', fact: 'Element tres reactif utilise dans la chimie du dentifrice.' },
+    Ne: { name: 'Neon', fact: 'Celebre pour les enseignes lumineuses.' },
+    Na: { name: 'Sodium', fact: 'Une partie du sel de table et tres reactif dans l eau.' },
+    Mg: { name: 'Magnesium', fact: 'Brule avec une flamme blanche tres vive.' },
+    Al: { name: 'Aluminium', fact: 'Metal leger utilise pour les canettes et les avions.' },
+    Si: { name: 'Silicium', fact: 'Present dans les puces, le verre et le sable.' },
+    P: { name: 'Phosphore', fact: 'Important pour les engrais et la biologie.' },
+    S: { name: 'Soufre', fact: 'Connu pour sa forte odeur dans certains composes.' },
+    Cl: { name: 'Chlore', fact: 'Utilise pour desinfecter les piscines et l eau.' },
+    Ar: { name: 'Argon', fact: 'Gaz calme souvent utilise dans les ampoules.' },
+  },
+  pt: {
+    H: { name: 'Hidrogenio', fact: 'O elemento mais comum do universo.' },
+    He: { name: 'Helio', fact: 'Faz os baloes flutuarem.' },
+    Li: { name: 'Litio', fact: 'Usado em baterias de celulares e carros eletricos.' },
+    Be: { name: 'Berilio', fact: 'Muito leve e muito rigido.' },
+    B: { name: 'Boro', fact: 'Ajuda a produzir vidro resistente ao calor.' },
+    C: { name: 'Carbono', fact: 'Base da vida, do grafite e do diamante.' },
+    N: { name: 'Nitrogenio', fact: 'A maior parte do ar ao nosso redor e nitrogenio.' },
+    O: { name: 'Oxigenio', fact: 'Essencial para respirar e para a combustao.' },
+    F: { name: 'Fluor', fact: 'Elemento muito reativo usado em quimica de pasta de dente.' },
+    Ne: { name: 'Neon', fact: 'Famoso pelos letreiros brilhantes.' },
+    Na: { name: 'Sodio', fact: 'Parte do sal de cozinha e muito reativo na agua.' },
+    Mg: { name: 'Magnesio', fact: 'Queima com uma chama branca muito forte.' },
+    Al: { name: 'Aluminio', fact: 'Metal leve usado em latas e avioes.' },
+    Si: { name: 'Silicio', fact: 'Presente em chips, vidro e areia.' },
+    P: { name: 'Fosforo', fact: 'Importante para fertilizantes e biologia.' },
+    S: { name: 'Enxofre', fact: 'Conhecido pelo cheiro forte em alguns compostos.' },
+    Cl: { name: 'Cloro', fact: 'Usado para desinfetar piscinas e agua.' },
+    Ar: { name: 'Argonio', fact: 'Gas calmo usado com frequencia em lampadas.' },
+  },
+};
+
+function normalizeLocale(raw?: string | null): Locale {
+  if (!raw) return 'en';
+  const base = raw.split('-')[0]?.toLowerCase();
+  return SUPPORTED.includes(base as Locale) ? (base as Locale) : 'en';
+}
+
+function detectLocale(): Locale {
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return normalizeLocale(stored);
+  }
+  if (typeof navigator !== 'undefined') return normalizeLocale(navigator.language);
+  return 'en';
+}
+
+export const locale = writable<Locale>(detectLocale());
+
+export const localeOptions = [
+  { value: 'en', label: 'English' },
+  { value: 'fr', label: 'Francais' },
+  { value: 'pt', label: 'Portugues' },
+];
+
+function currentLocale(lang?: Locale): Locale {
+  return lang ?? get(locale);
+}
+
+function interpolate(template: string, vars?: Record<string, string | number>) {
+  if (!vars) return template;
+  let text = template;
+  for (const [key, value] of Object.entries(vars)) {
+    text = text.split(`{${key}}`).join(String(value));
+  }
+  return text;
+}
+
+export function getLocale(): Locale {
+  return get(locale);
+}
+
+export function setLocale(next: string): Locale {
+  const lang = normalizeLocale(next);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, lang);
+  }
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = lang;
+  }
+  locale.set(lang);
+  return lang;
+}
+
+export function t(key: string, vars?: Record<string, string | number>, lang?: Locale) {
+  const active = currentLocale(lang);
+  const table = STRINGS[active] ?? STRINGS.en;
+  return interpolate(table[key] ?? STRINGS.en[key] ?? key, vars);
+}
+
+export function fruitLabel(index: number, lang?: Locale) {
+  const active = currentLocale(lang);
+  return FRUIT_LABELS[active]?.[index] ?? FRUIT_LABELS.en[index] ?? `Tier ${index + 1}`;
+}
+
+export function numberFact(number: number, lang?: Locale) {
+  const active = currentLocale(lang);
+  return NUMBER_FACTS[active]?.[number] ?? NUMBER_FACTS.en[number] ?? String(number);
+}
+
+export function atomName(symbolOrSpec: string | { symbol?: string }, lang?: Locale) {
+  const symbol = typeof symbolOrSpec === 'string' ? symbolOrSpec : symbolOrSpec?.symbol ?? '';
+  const specName =
+    typeof symbolOrSpec === 'string'
+      ? ''
+      : typeof (symbolOrSpec as { name?: string }).name === 'string'
+        ? (symbolOrSpec as { name?: string }).name ?? ''
+        : '';
+  const active = currentLocale(lang);
+  return ATOM_COPY[active]?.[symbol]?.name ?? ATOM_COPY.en[symbol]?.name ?? specName ?? symbol;
+}
+
+export function atomFact(symbolOrSpec: string | { symbol?: string }, lang?: Locale) {
+  const symbol = typeof symbolOrSpec === 'string' ? symbolOrSpec : symbolOrSpec?.symbol ?? '';
+  const specFact =
+    typeof symbolOrSpec === 'string'
+      ? ''
+      : typeof (symbolOrSpec as { fact?: string }).fact === 'string'
+        ? (symbolOrSpec as { fact?: string }).fact ?? ''
+        : '';
+  const active = currentLocale(lang);
+  return ATOM_COPY[active]?.[symbol]?.fact ?? ATOM_COPY.en[symbol]?.fact ?? specFact;
+}

@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+*.err
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+check.log
+dev.err
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Capacitor native local/build artifacts
+android/.gradle/
+android/local.properties
+android/**/build/
+android/captures/
+ios/DerivedData/
+ios/App/Pods/
+ios/App/build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+
+# Legacy vendored libs (runtime uses npm packages `three` and `cannon-es`)
+src/lib/game/cannon-es.js
+src/lib/game/three.module.js

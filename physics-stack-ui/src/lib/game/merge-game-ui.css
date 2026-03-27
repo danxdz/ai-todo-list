@@ -1,0 +1,482 @@
+/**
+ * Shared UI shell for fruit / numbers / atoms merge demos.
+ * Add to <body>: class "merge-game" + one of theme-marble | theme-numbers | theme-atoms
+ */
+
+.merge-game {
+  --hud-glass: rgba(8, 10, 20, 0.48);
+  --hud-border: rgba(100, 130, 200, 0.28);
+  --hud-accent: #7ab8ff;
+  --menu-panel-bg: rgba(14, 16, 28, 0.97);
+  --menu-accent: rgba(180, 210, 255, 0.95);
+  /** Must match MERGE_GAME_HUD_BOTTOM_RESERVE_PX in js/viewport-ortho.js */
+  --merge-hud-bottom-reserve: 96px;
+}
+
+.merge-game.theme-marble {
+  --hud-border: rgba(120, 160, 220, 0.3);
+  --hud-accent: #9ec5ff;
+}
+
+.merge-game.theme-numbers {
+  --hud-border: rgba(200, 140, 200, 0.28);
+  --hud-accent: #ffb8e0;
+}
+
+.merge-game.theme-atoms {
+  --hud-glass: rgba(8, 22, 16, 0.52);
+  --hud-border: rgba(100, 200, 150, 0.28);
+  --hud-accent: #9ee0c0;
+  --menu-panel-bg: linear-gradient(168deg, rgba(18, 36, 28, 0.98), rgba(8, 18, 12, 0.99));
+}
+
+/* Top-right: menu + mute — X position synced in JS to cup inner-right (see hud-playfield-align.js) */
+.merge-game .hud-top-actions {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  z-index: 6;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.merge-game .hud-top-actions .hud-menu-btn,
+.merge-game .hud-top-actions .hud-mute-btn {
+  pointer-events: auto;
+}
+
+/* Stats: sit in reserved bottom strip (canvas height excludes this — see viewport-ortho.js) */
+.merge-game #hud {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  height: var(--merge-hud-bottom-reserve);
+  top: auto;
+  z-index: 3;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 6px;
+}
+
+.merge-game .bottom-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: var(--hud-glass);
+  border: 1px solid var(--hud-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: min(100%, 520px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.merge-game .hud-stats-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.merge-game .hud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.merge-game .btn-ghost,
+.merge-game .hud-menu-btn {
+  pointer-events: auto;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(230, 240, 255, 0.95);
+  background: rgba(22, 32, 52, 0.65);
+  border: 1px solid var(--hud-border);
+  border-radius: 9px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.merge-game .btn-ghost:active,
+.merge-game .hud-menu-btn:active {
+  transform: scale(0.97);
+}
+
+.merge-game .hud-mute-btn {
+  pointer-events: auto;
+  padding: 5px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid var(--hud-border);
+  background: rgba(18, 28, 40, 0.88);
+  color: #c8e4ff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.merge-game .hud-mute-btn.muted {
+  opacity: 0.55;
+}
+
+.merge-game .hud-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+/* Single compact row: brand + inline stats (no tall stack) */
+.merge-game .hud-inline {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.merge-game .hud-inline .hud-stat {
+  flex: 0 0 auto;
+}
+
+.merge-game .hud-inline .hud-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .merge-game .hud-value {
+    font-size: clamp(1.05rem, 5.5vw, 1.45rem);
+  }
+}
+
+.merge-game .hud-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.06rem;
+}
+
+.merge-game #hud .hud-label {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.merge-game #hud .hud-value {
+  font-size: clamp(1rem, 4.2vw, 1.32rem);
+}
+
+/* Legacy top-right HUD → treat same as column inside bar */
+.merge-game .hud-column--stack {
+  width: 100%;
+}
+
+/* Single slide-up menu (replaces duplicate help + extra menus) */
+.merge-game #gameMenu {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 17;
+  align-items: flex-end;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom));
+  background: rgba(4, 8, 14, 0.5);
+  backdrop-filter: blur(5px);
+  pointer-events: auto;
+}
+
+.merge-game #gameMenu.visible {
+  display: flex;
+}
+
+.merge-game .game-menu-panel {
+  width: min(400px, 100%);
+  max-height: min(78dvh, 520px);
+  overflow: auto;
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  background: var(--menu-panel-bg);
+  border: 1px solid var(--hud-border);
+}
+
+.merge-game.theme-atoms .game-menu-panel {
+  color: rgba(200, 235, 215, 0.92);
+}
+
+.merge-game .game-menu-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--menu-accent);
+}
+
+.merge-game .game-menu-panel p,
+.merge-game .game-menu-panel .menu-muted {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(180, 200, 230, 0.88);
+}
+
+.merge-game .game-menu-close {
+  float: right;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(40, 55, 75, 0.65);
+  color: #d0e4ff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.merge-game .game-menu-close:active {
+  transform: scale(0.95);
+}
+
+.merge-game .menu-lang {
+  margin: 10px 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(180, 195, 220, 0.9);
+}
+
+.merge-game .menu-lang select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--hud-border);
+  background: rgba(20, 28, 44, 0.9);
+  color: #e8f0ff;
+  font: inherit;
+  font-size: 12px;
+}
+
+.merge-game .menu-links-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.merge-game .menu-links-row a {
+  color: var(--hud-accent);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.merge-game .menu-links-row a:hover {
+  text-decoration: underline;
+}
+
+/* Physics debug lives in slide-up menu (keeps playfield visible) */
+.merge-game .phys-dbg-wrap {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #b8c4d8;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.merge-game .menu-tier-line,
+.merge-game .menu-tip-line {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(180, 200, 230, 0.88);
+}
+
+.merge-game .menu-tier-line .menu-tier-label,
+.merge-game .menu-tip-line .menu-tip-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(140, 165, 200, 0.65);
+  margin-bottom: 2px;
+}
+
+.merge-game .menu-tip-line {
+  margin-top: 8px;
+}
+
+.merge-game.theme-atoms .menu-tier-line,
+.merge-game.theme-atoms .menu-tip-line {
+  color: rgba(190, 225, 210, 0.9);
+}
+
+.merge-game.theme-atoms .menu-tier-line .menu-tier-label,
+.merge-game.theme-atoms .menu-tip-line .menu-tip-label {
+  color: rgba(130, 190, 160, 0.65);
+}
+
+.merge-game .phys-dbg-wrap button,
+.merge-game .phys-dbg-wrap input {
+  pointer-events: auto;
+}
+
+/* Remove duplicate floating help strip */
+.merge-game #help {
+  display: none !important;
+}
+
+.merge-game .menu-streak-row {
+  margin: 8px 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(170, 200, 235, 0.85);
+}
+
+.merge-game.theme-atoms .menu-streak-row {
+  color: rgba(160, 230, 200, 0.88);
+}
+
+.merge-game .menu-share-btn {
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid var(--hud-border);
+  background: rgba(28, 40, 62, 0.75);
+  color: var(--hud-accent);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.merge-game #welcomeAtoms {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 22;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: rgba(4, 10, 18, 0.72);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.merge-game #welcomeAtoms.visible {
+  display: flex;
+}
+
+.merge-game .welcome-atoms-panel {
+  width: min(380px, 100%);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  background: var(--menu-panel-bg);
+  border: 1px solid var(--hud-border);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
+.merge-game .welcome-atoms-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--menu-accent);
+}
+
+.merge-game .welcome-atoms-line {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(190, 210, 235, 0.92);
+}
+
+.merge-game.theme-atoms .welcome-atoms-line {
+  color: rgba(200, 235, 218, 0.92);
+}
+
+.merge-game .welcome-atoms-fact {
+  margin: 10px 0 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-style: italic;
+  opacity: 0.9;
+  color: rgba(160, 200, 230, 0.88);
+}
+
+.merge-game.theme-atoms .welcome-atoms-fact {
+  color: rgba(150, 220, 190, 0.88);
+}
+
+.merge-game .welcome-atoms-play {
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: linear-gradient(165deg, rgba(100, 180, 140, 0.95), rgba(40, 100, 80, 0.98));
+  color: #0a1210;
+}
+
+.merge-game #retentionToastHost {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--merge-hud-bottom-reserve, 96px) + 8px);
+  transform: translateX(-50%);
+  z-index: 19;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: min(92vw, 360px);
+}
+
+.merge-game .retention-toast {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: center;
+  color: #e8f4ff;
+  background: rgba(12, 22, 38, 0.92);
+  border: 1px solid rgba(120, 160, 220, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.merge-game .retention-toast.retention-toast--in {
+  opacity: 1;
+  transform: translateY(0);
+}

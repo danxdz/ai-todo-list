@@ -173,6 +173,15 @@ function moleculeBoardResultType(ctx, recipe) {
 
   const inputs = Array.isArray(recipe?.inputs) ? recipe.inputs : [];
   if (inputs.length <= 0) return null;
+
+  // Compounds with more than one element: consume all atoms, no single-atom "residue" on the board.
+  const distinctZ = new Set();
+  for (const raw of inputs) {
+    const z = Number(raw);
+    if (Number.isFinite(z) && z > 0) distinctZ.add(z);
+  }
+  if (distinctZ.size > 1) return null;
+
   let heaviestAtomic = 0;
   for (const atomicNumber of inputs) {
     const z = Number(atomicNumber);
@@ -482,22 +491,26 @@ function createMolecule(ctx, recipe, cluster, vfxLevel = 'normal') {
   const notifyY = Number.isFinite(notifyAnchor?.y) ? notifyAnchor.y : cluster.y + 0.52;
   const formulaDisplay =
     ctx.formatChemicalFormula?.(recipe.formula) ?? formatChemicalFormula(recipe.formula);
+  const entryCount = cluster.entries.length;
+  const fusionX = cluster.x;
+  const fusionY = cluster.y;
 
   for (const f of [...cluster.entries]) ctx.removeFruit(f);
 
   if (boardResultType != null) {
     const boardRadius = radiusForType(ctx, boardResultType);
     const atomMode = ctx.mode === 'atoms';
-    const safeSpawn = resolveMergeSpawnPose(ctx, cluster.x, cluster.y, boardRadius, {
-      anchorX: cluster.x,
+    const safeSpawn = resolveMergeSpawnPose(ctx, fusionX, fusionY, boardRadius, {
+      anchorX: fusionX,
       maxLateralShift: atomMode ? Math.max(0.06, boardRadius * 0.14) : Math.max(0.1, boardRadius * 0.24),
       preferVertical: atomMode,
     });
-    ctx.spawnFruit(boardResultType, safeSpawn.x, safeSpawn.y, ctx.ROW_Z, { fusionPop: true });
+    const fusionPop = recipe.spawnFusionPop !== false;
+    ctx.spawnFruit(boardResultType, safeSpawn.x, safeSpawn.y, ctx.ROW_Z, { fusionPop });
     const spawned = ctx.getFruits()[ctx.getFruits().length - 1];
     if (spawned?.body) {
       settleMergedBody(ctx, spawned, boardRadius, {
-        anchorX: cluster.x,
+        anchorX: fusionX,
         maxLateralShift: atomMode ? Math.max(0.07, boardRadius * 0.16) : Math.max(0.12, boardRadius * 0.28),
       });
       spawned.body.velocity.set(carryVx * 0.12, Math.min(0.04, Math.max(-0.03, carryVy * 0.08)), 0);
@@ -506,122 +519,133 @@ function createMolecule(ctx, recipe, cluster, vfxLevel = 'normal') {
     }
   }
 
+  // Ghost atoms + camera zoom run first; heavy juice runs after a short beat (see scheduleMoleculeFormationJuice).
+  ctx.spawnMoleculeEntity?.(recipe, fusionX, fusionY, {
+    sourceCount: entryCount,
+  });
+
   const fxBoostRaw = Number(recipe?.fxIntensity);
   const fxBoost = Number.isFinite(fxBoostRaw) ? clamp(fxBoostRaw, 0.4, 2.8) : 1;
   const baseIntensity = (vfxMin ? 0.78 : vfxNorm ? 1 : 1.18) * fxBoost * explosionScaleMul;
   const special = isSpecialRecipe(recipe);
   const explosionIntensity = special ? baseIntensity * 1.25 : baseIntensity;
 
-  if (typeof ctx.juice.creationExplosion === 'function') {
-    ctx.juice.creationExplosion(cluster.x, cluster.y, ctx.ROW_Z + 0.03, explosionIntensity);
-  } else if (typeof ctx.juice.moleculeCreationBurst === 'function') {
-    ctx.juice.moleculeCreationBurst(
-      cluster.x,
-      cluster.y,
-      ctx.ROW_Z + 0.03,
-      color,
-      formulaDisplay,
-      explosionIntensity,
-    );
-  } else {
-    ctx.juice.burst(
-      cluster.x,
-      cluster.y,
-      ctx.ROW_Z + 0.03,
-      color,
-      vfxMin ? Math.max(12, Math.floor(26 * burstScale)) : burstCount,
-      Math.max(0.45, burstBoost),
-      'jackpot',
-    );
-    ctx.juice.burstSparks(
-      cluster.x,
-      cluster.y,
-      ctx.ROW_Z + 0.08,
-      color,
-      vfxMin
-        ? Math.max(4, Math.floor(12 * sparkScaleMul))
-        : Math.min(64, Math.floor(burstCount * 0.34 * sparkScaleMul)),
-    );
-    ctx.juice.smokePuff?.(
-      cluster.x,
-      cluster.y,
-      ctx.ROW_Z + 0.03,
-      color,
-      vfxMin
-        ? Math.max(2, Math.floor(12 * smokeScaleMul))
-        : Math.min(84, Math.floor(burstCount * 0.46 * smokeScaleMul)),
-    );
-    if (!vfxNorm) {
-      ctx.juice.shatterSpray?.(
-        cluster.x,
-        cluster.y,
+  const clusterAnchor = { x: fusionX, y: fusionY };
+
+  function runMoleculeFormationJuice() {
+    if (typeof ctx.juice.creationExplosion === 'function') {
+      ctx.juice.creationExplosion(fusionX, fusionY, ctx.ROW_Z + 0.03, explosionIntensity);
+    } else if (typeof ctx.juice.moleculeCreationBurst === 'function') {
+      ctx.juice.moleculeCreationBurst(
+        fusionX,
+        fusionY,
         ctx.ROW_Z + 0.03,
         color,
-        Math.min(50, Math.floor(burstCount * 0.24 * shatterScaleMul)),
+        formulaDisplay,
+        explosionIntensity,
       );
+    } else {
+      ctx.juice.burst(
+        fusionX,
+        fusionY,
+        ctx.ROW_Z + 0.03,
+        color,
+        vfxMin ? Math.max(12, Math.floor(26 * burstScale)) : burstCount,
+        Math.max(0.45, burstBoost),
+        'jackpot',
+      );
+      ctx.juice.burstSparks(
+        fusionX,
+        fusionY,
+        ctx.ROW_Z + 0.08,
+        color,
+        vfxMin
+          ? Math.max(4, Math.floor(12 * sparkScaleMul))
+          : Math.min(64, Math.floor(burstCount * 0.34 * sparkScaleMul)),
+      );
+      ctx.juice.smokePuff?.(
+        fusionX,
+        fusionY,
+        ctx.ROW_Z + 0.03,
+        color,
+        vfxMin
+          ? Math.max(2, Math.floor(12 * smokeScaleMul))
+          : Math.min(84, Math.floor(burstCount * 0.46 * smokeScaleMul)),
+      );
+      if (!vfxNorm) {
+        ctx.juice.shatterSpray?.(
+          fusionX,
+          fusionY,
+          ctx.ROW_Z + 0.03,
+          color,
+          Math.min(50, Math.floor(burstCount * 0.24 * shatterScaleMul)),
+        );
+      }
     }
+
+    const elementalMode = String(moleculeProfile?.elementalMode ?? 'auto').toLowerCase();
+    if (elementalMode === 'water' || (elementalMode === 'auto' && isWaterRecipe(recipe))) {
+      ctx.juice.waterSplash?.(fusionX, fusionY, ctx.ROW_Z + 0.04, baseIntensity);
+      ctx.juice.waterScreenDroplets?.((vfxMin ? 0.9 : vfxNorm ? 1.1 : 1.25) * dropletScaleMul);
+    } else if (elementalMode === 'fire' || (elementalMode === 'auto' && isFireRecipe(recipe))) {
+      ctx.juice.fireBurst?.(fusionX, fusionY, ctx.ROW_Z + 0.04, baseIntensity * 1.08);
+    } else if (elementalMode === 'explosion') {
+      ctx.juice.creationExplosion?.(fusionX, fusionY, ctx.ROW_Z + 0.05, baseIntensity * 0.88);
+    } else {
+      ctx.juice.moleculeSmoke?.(fusionX, fusionY, ctx.ROW_Z + 0.04, color, baseIntensity);
+    }
+    if (!vfxMin) {
+      const configuredTrailStyle = String(moleculeProfile?.trailStyle ?? 'auto').toLowerCase();
+      const trailStyle =
+        configuredTrailStyle === 'auto' ? (special ? 'full' : 'lite') : configuredTrailStyle;
+      const trailIntensity = special
+        ? 0.98 + Math.min(1.12, entryCount * 0.06)
+        : 0.72 + Math.min(0.42, entryCount * 0.045);
+      if (trailStyle !== 'none') {
+        ctx.juice.specialMoleculeTrails?.(
+          fusionX,
+          fusionY + 0.04,
+          ctx.ROW_Z + 0.09,
+          color,
+          trailIntensity * trailScaleMul,
+          trailStyle,
+        );
+      }
+    }
+    ctx.juice.playFxProfileStack?.(moleculeProfile, {
+      worldX: fusionX,
+      worldY: fusionY,
+      worldZ: ctx.ROW_Z + 0.04,
+      targetX: fusionX,
+      targetY: fusionY,
+      targetZ: ctx.ROW_Z + 0.04,
+      color,
+      intensity: baseIntensity,
+      variant: 'jackpot',
+    });
+    applyWorldMoleculeMechanics(ctx, clusterAnchor, recipe, points, baseIntensity);
+    if (typeof ctx.Sfx.playMolecule === 'function') ctx.Sfx.playMolecule(entryCount);
+    else ctx.Sfx.playJackpot(1.35);
+    ctx.vibrateJackpot((1.28 + Math.min(1.1, entryCount * 0.04)) * vibrateScale);
+    const hitPauseDuration = special ? (vfxMin ? 0.08 : 0.14) : vfxMin ? 0.065 : 0.12;
+    ctx.queueHitPause(hitPauseDuration * hitPauseScale);
   }
 
-  const elementalMode = String(moleculeProfile?.elementalMode ?? 'auto').toLowerCase();
-  if (elementalMode === 'water' || (elementalMode === 'auto' && isWaterRecipe(recipe))) {
-    ctx.juice.waterSplash?.(cluster.x, cluster.y, ctx.ROW_Z + 0.04, baseIntensity);
-    ctx.juice.waterScreenDroplets?.((vfxMin ? 0.9 : vfxNorm ? 1.1 : 1.25) * dropletScaleMul);
-  } else if (elementalMode === 'fire' || (elementalMode === 'auto' && isFireRecipe(recipe))) {
-    ctx.juice.fireBurst?.(cluster.x, cluster.y, ctx.ROW_Z + 0.04, baseIntensity * 1.08);
-  } else if (elementalMode === 'explosion') {
-    ctx.juice.creationExplosion?.(cluster.x, cluster.y, ctx.ROW_Z + 0.05, baseIntensity * 0.88);
+  if (typeof ctx.scheduleMoleculeFormationJuice === 'function') {
+    ctx.scheduleMoleculeFormationJuice(runMoleculeFormationJuice);
   } else {
-    ctx.juice.moleculeSmoke?.(cluster.x, cluster.y, ctx.ROW_Z + 0.04, color, baseIntensity);
+    runMoleculeFormationJuice();
   }
-  if (!vfxMin) {
-    const configuredTrailStyle = String(moleculeProfile?.trailStyle ?? 'auto').toLowerCase();
-    const trailStyle =
-      configuredTrailStyle === 'auto' ? (special ? 'full' : 'lite') : configuredTrailStyle;
-    const trailIntensity = special
-      ? 0.98 + Math.min(1.12, cluster.entries.length * 0.06)
-      : 0.72 + Math.min(0.42, cluster.entries.length * 0.045);
-    if (trailStyle !== 'none') {
-      ctx.juice.specialMoleculeTrails?.(
-        cluster.x,
-        cluster.y + 0.04,
-        ctx.ROW_Z + 0.09,
-        color,
-        trailIntensity * trailScaleMul,
-        trailStyle,
-      );
-    }
-  }
-  ctx.juice.playFxProfileStack?.(moleculeProfile, {
-    worldX: cluster.x,
-    worldY: cluster.y,
-    worldZ: ctx.ROW_Z + 0.04,
-    targetX: cluster.entries[0]?.body?.position?.x,
-    targetY: cluster.entries[0]?.body?.position?.y,
-    targetZ: ctx.ROW_Z + 0.04,
-    color,
-    intensity: baseIntensity,
-    variant: 'jackpot',
-  });
-  // Keep in-world molecule entity at real fusion position (not UI center)
-  // so we avoid visual duplication with centered popup.
-  ctx.spawnMoleculeEntity?.(recipe, cluster.x, cluster.y, {
-    sourceCount: cluster.entries.length,
-  });
+
   ctx.addScore(points, { skipScorePulse: true });
   ctx.onMoleculeFusion?.({
     recipe,
     basePoints,
     points,
-    x: cluster.x,
-    y: cluster.y,
+    x: fusionX,
+    y: fusionY,
     formula: formulaDisplay,
   });
-  applyWorldMoleculeMechanics(ctx, cluster, recipe, points, baseIntensity);
-  if (typeof ctx.Sfx.playMolecule === 'function') ctx.Sfx.playMolecule(cluster.entries.length);
-  else ctx.Sfx.playJackpot(1.35);
-  ctx.vibrateJackpot((1.28 + Math.min(1.1, cluster.entries.length * 0.04)) * vibrateScale);
-  const hitPauseDuration = special ? (vfxMin ? 0.08 : 0.14) : vfxMin ? 0.065 : 0.12;
-  ctx.queueHitPause(hitPauseDuration * hitPauseScale);
   ctx.setMergeCooldown(18);
   return true;
 }

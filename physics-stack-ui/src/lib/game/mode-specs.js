@@ -102,26 +102,33 @@ function createElectronOrbitBand({
 }) {
   const group = new THREE.Group();
   const ringThickness = Math.max(atomRadius * 0.0024, thickness * 0.22);
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(orbitRadius, ringThickness, 8, 56),
-    new THREE.MeshBasicMaterial({
-      color: colorValue,
-      transparent: true,
-      opacity: opacity * (ghost ? 0.08 : 0.12),
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
-  group.add(ring);
+  const arcCount = Math.max(3, Math.min(6, Math.round(3 + orbitRadius / Math.max(atomRadius * 0.42, 0.01))));
+  const arcMaterial = new THREE.MeshBasicMaterial({
+    color: colorValue,
+    transparent: true,
+    opacity: opacity * (ghost ? 0.07 : 0.12),
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  for (let i = 0; i < arcCount; i += 1) {
+    const arc = new THREE.Mesh(
+      new THREE.TorusGeometry(orbitRadius + i * ringThickness * 0.2, ringThickness * 0.82, 8, 48),
+      arcMaterial.clone(),
+    );
+    arc.rotation.z = seed * 0.9 + i * 0.48;
+    arc.scale.set(1, 0.96 + i * 0.02, 1);
+    group.add(arc);
+  }
 
-  const dotCount = Math.max(8, Math.min(16, Math.round(8 + orbitRadius / Math.max(atomRadius * 0.32, 0.01) * 1.6)));
+  const dotCount = Math.max(10, Math.min(22, Math.round(10 + orbitRadius / Math.max(atomRadius * 0.28, 0.01) * 2.4)));
   const dotRadius = Math.max(atomRadius * 0.038, thickness * 0.9, 0.008);
   const glowRadius = dotRadius * 2.2;
   const dotColor = new THREE.Color(colorValue).offsetHSL(0, 0.05, 0.12);
   const arcWindows = [
-    [0.04 + seed * 0.011, 0.2 + seed * 0.011],
-    [0.34 + seed * 0.009, 0.52 + seed * 0.009],
-    [0.7 + seed * 0.007, 0.88 + seed * 0.007],
+    [0.04 + seed * 0.011, 0.18 + seed * 0.011],
+    [0.28 + seed * 0.009, 0.46 + seed * 0.009],
+    [0.58 + seed * 0.007, 0.76 + seed * 0.007],
+    [0.84 + seed * 0.005, 0.96 + seed * 0.005],
   ];
 
   for (let step = 0; step < dotCount; step += 1) {
@@ -135,16 +142,17 @@ function createElectronOrbitBand({
     if (!inArc) continue;
 
     const angle = wrapped * Math.PI * 2;
-    const zWobble = Math.sin(angle * 2.4 + seed * 3.1) * thickness * 3.2;
-    const x = Math.cos(angle) * orbitRadius;
-    const y = Math.sin(angle) * orbitRadius * 0.98;
+    const radialJitter = 1 + Math.sin(angle * 3.4 + seed * 4.2) * 0.05;
+    const zWobble = Math.sin(angle * 2.4 + seed * 3.1) * thickness * 4.8;
+    const x = Math.cos(angle) * orbitRadius * radialJitter;
+    const y = Math.sin(angle) * orbitRadius * 0.98 * radialJitter;
 
     const glow = new THREE.Mesh(
       new THREE.SphereGeometry(glowRadius, 8, 6),
       new THREE.MeshBasicMaterial({
         color: dotColor,
         transparent: true,
-        opacity: opacity * (ghost ? 0.08 : 0.12),
+        opacity: opacity * (ghost ? 0.09 : 0.14),
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),
@@ -157,7 +165,7 @@ function createElectronOrbitBand({
       new THREE.MeshBasicMaterial({
         color: dotColor,
         transparent: true,
-        opacity: opacity * (ghost ? 0.42 : 0.72),
+        opacity: opacity * (ghost ? 0.54 : 0.88),
         depthWrite: false,
       }),
     );

@@ -266,6 +266,8 @@ export function createMergeGame(opts) {
 
   let CUP = { ...CUP_BASE, wallH: 11 };
   let DROP_CENTER_Y = CUP.wallH - 0.55;
+  /** World Y of the queue strip row (updated in {@link layoutQueuePreviewMeshes}). */
+  let queueStripRowY = DROP_CENTER_Y - 0.9;
   let GAME_OVER_Y = CUP.wallH - GAME_OVER_BELOW_RIM;
 
   const listeners = [];
@@ -662,7 +664,7 @@ export function createMergeGame(opts) {
       resolveCollisionFxProfile(entry, other);
     if (!profile && reaction === 'none') return;
     if (!hasMatchedRule && !sameType) return;
-    if (!hasMatchedRule && sameType && impact < 0.7) return;
+    if (!hasMatchedRule && sameType && impact < 1.05) return;
 
     const entryRadius = collisionRadiusForFruit(entry);
     const otherRadius = collisionRadiusForFruit(other);
@@ -670,7 +672,7 @@ export function createMergeGame(opts) {
     const worldY = (entry.body.position.y + other.body.position.y) * 0.5;
     const worldZ = ROW_Z + 0.03;
     const color = mixColors(Number(FRUITS[entry.type]?.color) || 0x9edcff, Number(FRUITS[other.type]?.color) || 0xffffff, 0.5);
-    const intensity = Math.max(0.16, Math.min(0.82, impact * 0.26)) * ruleIntensity;
+    const intensity = Math.max(0.12, Math.min(0.48, impact * 0.18)) * ruleIntensity;
     const radius = Math.max(entryRadius, otherRadius) * 0.92;
 
     juice.playFxProfileStack?.(profile, {
@@ -1380,7 +1382,7 @@ export function createMergeGame(opts) {
       }
       if (!separated) break;
     }
-    for (const fruit of fruits) fruit.root.position.copy(fruit.body.position);
+    for (const fruit of fruits) syncFruitVisualPosition(fruit);
   }
 
   function settlePileBeforeDrop() {
@@ -1499,6 +1501,14 @@ export function createMergeGame(opts) {
     }
   }
 
+  /** Physics stays at ROW_Z; nudge mesh Z slightly toward camera so tint matches the drop preview (GHOST_Z). */
+  function syncFruitVisualPosition(fruit) {
+    fruit.root.position.copy(fruit.body.position);
+    if (mode === 'atoms') {
+      fruit.root.position.z += 0.12;
+    }
+  }
+
   function spawnFruit(type, x, y, z, options = {}) {
     const spec = FRUITS[type];
     const drawRadius = spec.radius;
@@ -1532,8 +1542,6 @@ export function createMergeGame(opts) {
     }
     world.addBody(body);
     scene.add(visual.root);
-    visual.root.position.copy(body.position);
-    visual.rotationTarget.quaternion.copy(body.quaternion);
     const entry = {
       ...visual,
       body,
@@ -1545,6 +1553,8 @@ export function createMergeGame(opts) {
       onCollide: null,
     };
     fruits.push(entry);
+    syncFruitVisualPosition(entry);
+    visual.rotationTarget.quaternion.copy(body.quaternion);
 
     if (mode === 'atoms') {
       body.addEventListener('collide', (event) => {
@@ -1705,6 +1715,12 @@ export function createMergeGame(opts) {
     const finalShatterAt = readNumber('finalShatterAt', 0.8, 0.2, 1);
     const finalShatter = Math.round(readNumber('finalShatter', 8 + fxIntensity * 8, 0, 80));
     const sparkCount = Math.round(readNumber('sparkCount', 10 + fxIntensity * 7, 3, 56));
+    let formationZoomInEnd = readNumber('formationZoomInEnd', 0.38, 0.18, 0.52);
+    let formationZoomHoldEnd = readNumber('formationZoomHoldEnd', 0.55, 0.35, 0.82);
+    if (formationZoomHoldEnd <= formationZoomInEnd) {
+      formationZoomHoldEnd = Math.min(0.82, formationZoomInEnd + 0.12);
+    }
+    const formationZoomPeak = readNumber('formationZoomPeak', 1.14, 1, 1.42);
     const inputs = Array.isArray(recipe?.inputs) ? recipe.inputs : [];
     const rawTypes = inputs
       .map((atomicNumber) => atomTypeByNumber.get(atomicNumber))
@@ -1763,13 +1779,6 @@ export function createMergeGame(opts) {
     group.position.set(x, y + 0.44 + Math.min(0.18, Math.sqrt(Math.max(2, sourceCount)) * 0.04), ROW_Z + 0.1);
     group.renderOrder = 22;
     scene.add(group);
-    juice.burstSparks(
-      group.position.x,
-      group.position.y + 0.02,
-      group.position.z + 0.06,
-      recipe?.color ?? 0xbde7ff,
-      sparkCount + selectedTypes.length * 2,
-    );
 
     moleculeEntities.push({
       group,
@@ -1780,6 +1789,8 @@ export function createMergeGame(opts) {
       color: recipe?.color ?? 0xbde7ff,
       didSmoke: false,
       didShatter: false,
+      didFormationSparks: false,
+      formationSparkCount: sparkCount + selectedTypes.length * 2,
       baseY: group.position.y,
       rise,
       floatWave,
@@ -1789,6 +1800,9 @@ export function createMergeGame(opts) {
       smokeCount,
       finalShatterAt,
       finalShatter,
+      formationZoomPeak,
+      formationZoomInEnd,
+      formationZoomHoldEnd,
       t: 0,
       dur: duration,
     });
@@ -1799,19 +1813,54 @@ export function createMergeGame(opts) {
       const item = moleculeEntities[i];
       item.t += dt;
       const u = Math.min(1, item.t / item.dur);
-      const introT = Math.min(1, u / 0.32);
-      const outroT = Math.max(0, (u - 0.32) / 0.68);
+      const introPhase = Math.max(0.12, Math.min(0.55, item.formationZoomInEnd ?? 0.38));
+      const zoomHold = Math.max(
+        introPhase + 0.04,
+        Math.min(0.9, item.formationZoomHoldEnd ?? 0.55),
+      );
+      const zoomPeak = Math.max(1, Math.min(1.42, item.formationZoomPeak ?? 1.14));
+      const introT = Math.min(1, u / introPhase);
+      const outroT = Math.max(0, (u - introPhase) / (1 - introPhase));
       const introEase = 1 - (1 - introT) * (1 - introT);
       item.group.rotation.y += dt * item.spinSpeed;
       item.group.position.y = item.baseY + Math.sin(item.t * 4.2) * item.floatWave + u * item.rise;
       const groupScale = item.startScale + (item.peakScale - item.startScale) * introEase;
-      item.group.scale.setScalar(groupScale);
+      // Local "zoom" on the formation only (does not move or scale the main camera).
+      let formationZoomMul = 1;
+      if (u < introPhase) {
+        const t = u / introPhase;
+        const e = 1 - (1 - t) * (1 - t);
+        formationZoomMul = 1 + (zoomPeak - 1) * e;
+      } else if (u < zoomHold) {
+        formationZoomMul = zoomPeak;
+      } else {
+        const denom = Math.max(0.05, 1 - zoomHold);
+        const t = (u - zoomHold) / denom;
+        const e = 1 - (1 - t) * (1 - t);
+        formationZoomMul = zoomPeak + (1 - zoomPeak) * e;
+      }
+      item.group.scale.setScalar(groupScale * formationZoomMul);
 
       for (const part of item.parts ?? []) {
         part.root.rotation.y += dt * part.spin;
         part.root.rotation.x += dt * part.spin * 0.35;
-        const drift = part.dir.clone().multiplyScalar(item.burstRadius * outroT * outroT);
-        part.root.position.copy(part.basePos).add(drift);
+        // Formation: atoms start spread along `dir`, ease into the ring, then drift outward in the outro.
+        const converge = item.burstRadius * (1 - introEase);
+        const radial = converge + item.burstRadius * outroT * outroT;
+        part.root.position.copy(part.basePos).add(part.dir.clone().multiplyScalar(radial));
+      }
+
+      if (!item.didFormationSparks && u >= introPhase * 0.92 && introPhase > 0) {
+        item.didFormationSparks = true;
+        if (item.formationSparkCount > 0) {
+          juice.burstSparks(
+            item.group.position.x,
+            item.group.position.y + 0.02,
+            item.group.position.z + 0.06,
+            item.color,
+            item.formationSparkCount,
+          );
+        }
       }
 
       if (!item.didSmoke && u >= item.smokeAt) {
@@ -1909,6 +1958,7 @@ export function createMergeGame(opts) {
     const yRowByCup = CUP.wallH - radiusMax - rimInset;
     const yRowByDropLane = DROP_CENTER_Y - radiusMax * 0.32 - laneInset;
     const yRow = Math.min(yRowByFrustum, yRowByCup, yRowByDropLane);
+    queueStripRowY = yRow;
     let cursor = innerLeft + 0.18;
     for (let i = QUEUE_STRIP_VISIBLE; i >= 1; i -= 1) {
       const entry = queuePreviewEntries[i];
@@ -1975,6 +2025,7 @@ export function createMergeGame(opts) {
     if (now - lastDropTime < DROP_COOLDOWN_MS) return;
     lastDropTime = now;
     settlePileBeforeDrop();
+    layoutQueuePreviewMeshes();
     const queuedNext = dropQueue[1];
     const queuedNextPos = queuePreviewEntries[1]?.root.position.clone() ?? null;
     const type = pendingDropType();
@@ -1982,6 +2033,10 @@ export function createMergeGame(opts) {
     spawnFruit(type, clamped.x, DROP_CENTER_Y, ROW_Z);
     const last = fruits[fruits.length - 1];
     last.body.velocity.set(0, -effectiveDropVy(), 0);
+    const dropTint = Number(FRUITS[type]?.color) || 0x9edcff;
+    juice.addDropGuideTrail?.(clamped.x, DROP_CENTER_Y, queueStripRowY, ROW_Z, dropTint, {
+      style: mode === 'atoms' ? 'full' : 'full',
+    });
     addScore(mode === 'atoms' ? 1 : 2);
     Sfx.playDrop();
     dropQueue.shift();
@@ -2144,6 +2199,10 @@ export function createMergeGame(opts) {
         ),
       }),
       spawnMoleculeEntity,
+      scheduleMoleculeFormationJuice: (fn) => {
+        if (mode === 'atoms') setTimeout(fn, 300);
+        else fn();
+      },
       onMoleculeFusion: ({ recipe, points }) => {
         const displayFormula = formatChemicalFormula(recipe.formula);
         touchDiscoveredMoleculeId(recipe.id);
@@ -2498,7 +2557,7 @@ export function createMergeGame(opts) {
         fruit.body.position.y = topSoftCap;
         fruit.body.velocity.y = Math.min(fruit.body.velocity.y, 0.18);
       }
-      fruit.root.position.copy(fruit.body.position);
+      syncFruitVisualPosition(fruit);
       fruit.rotationTarget.quaternion.copy(fruit.body.quaternion);
       if (fruit.fusionDur != null) {
         fruit.fusionT += dt;

@@ -350,15 +350,15 @@ export function createPlayfieldCup(opts) {
       new THREE.MeshPhysicalMaterial({
         color: glassHex,
         metalness: 0,
-        roughness: 0.08,
-        transmission: 0.62,
-        thickness: 0.35,
+        roughness: 0.11,
+        transmission: 0.38,
+        thickness: 0.26,
         ior: 1.48,
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.2,
         side: THREE.DoubleSide,
         depthWrite: false,
-        envMapIntensity: 1,
+        envMapIntensity: 0.72,
       });
     const wallH = wh + 0.45;
     const wallWz = hz * 2 + 0.06;

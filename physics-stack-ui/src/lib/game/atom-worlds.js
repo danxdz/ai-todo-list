@@ -51,6 +51,7 @@ export const WORLDS = {
         color: 0xe4f5ff,
         fact: 'Hydrogen gas is the lightest molecule in the universe.',
         unlockLevel: 3,
+        spawnFusionPop: false,
       }),
       localRecipe({
         id: 'oxygen_gas',
@@ -62,6 +63,7 @@ export const WORLDS = {
         color: 0xffa3a3,
         fact: 'Molecular oxygen is what we breathe.',
         unlockLevel: 3,
+        spawnFusionPop: false,
       }),
       withDefaults({ id: 'water' }, { points: 520, multiplier: 3.5, unlockLevel: 5 }),
       withDefaults({ id: 'carbon_dioxide' }, { points: 560, multiplier: 3.7, unlockLevel: 5 }),
@@ -113,6 +115,7 @@ export const WORLDS = {
         color: 0x8cf26f,
         fact: 'Chlorine gas is highly reactive and should be handled carefully.',
         unlockLevel: 6,
+        spawnFusionPop: false,
       }),
       withDefaults({ id: 'nitrogen_dioxide' }, { points: 820, multiplier: 4.6, unlockLevel: 7 }),
       withDefaults({ id: 'sulfur_dioxide' }, { points: 900, multiplier: 4.8, unlockLevel: 8 }),

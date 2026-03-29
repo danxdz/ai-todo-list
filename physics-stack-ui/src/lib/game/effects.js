@@ -48,6 +48,8 @@ export function createJuice(scene, options = {}) {
     trailDensity: 1,
     dropletDensity: 1,
     bondLinkIntensity: 1,
+    /** 0 = off: electron-like particles along drop line toward the queue / bottom HUD. */
+    dropTrailDensity: 1,
   };
   const fxConfig = { ...FX_DEFAULTS };
 
@@ -67,6 +69,7 @@ export function createJuice(scene, options = {}) {
       trailDensity: read('trailDensity'),
       dropletDensity: read('dropletDensity'),
       bondLinkIntensity: read('bondLinkIntensity'),
+      dropTrailDensity: read('dropTrailDensity'),
     };
   }
 
@@ -343,6 +346,16 @@ export function createJuice(scene, options = {}) {
       }
       return;
     }
+    if (event.kind === 'dropGuide') {
+      removeFromScene(event.group);
+      if (Array.isArray(event.streams)) {
+        for (const s of event.streams) {
+          s?.pts?.geometry?.dispose?.();
+          s?.material?.dispose?.();
+        }
+      }
+      return;
+    }
     removeFromScene(event.lines);
     event.lines.geometry?.dispose?.();
     event.lines.material?.dispose?.();
@@ -404,6 +417,85 @@ export function createJuice(scene, options = {}) {
       (vivid ? new THREE.Color(0xff674d) : new THREE.Color(0xff7f68)).getHex(),
       (vivid ? new THREE.Color(0xd968ff) : new THREE.Color(0xb186ff)).getHex(),
     ];
+  }
+
+  /**
+   * Short “electron” trail from drop height down toward the queue / bottom strip (merge-game style).
+   * @param {number} worldX
+   * @param {number} yTop - world Y at drop line (higher)
+   * @param {number} yBottom - world Y near queue / HUD (lower)
+   * @param {number} worldZ
+   * @param {number} [color]
+   * @param {{ intensity?: number, style?: string }} [options]
+   */
+  function addDropGuideTrail(worldX, yTop, yBottom, worldZ, color, options = {}) {
+    const dropD = fxScale('dropTrailDensity');
+    if (dropD <= 0.001) return;
+    const vivid = options.style !== 'lite';
+    const i = Math.max(
+      0.35,
+      Math.min(vivid ? 2.4 : 1.6, (options.intensity ?? 1) * (0.45 + dropD * 0.55)),
+    );
+    while (trailEvents.length >= MAX_TRAIL_EVENTS) {
+      disposeTrailEvent(trailEvents.shift());
+    }
+    let yHi = yTop;
+    let yLo = yBottom;
+    if (yLo > yHi) {
+      const t = yHi;
+      yHi = yLo;
+      yLo = t;
+    }
+    const span = Math.max(0.2, yHi - yLo);
+    const palette = buildTrailColorSet(color, vivid);
+    const group = new THREE.Group();
+    group.position.set(worldX, yLo, worldZ);
+    group.renderOrder = 920;
+    group.frustumCulled = false;
+    scene.add(group);
+
+    const streamCount = Math.max(2, Math.round(3 + i * 2.2));
+    const dotsPerStream = Math.max(10, Math.round(14 + i * 10));
+    const streams = [];
+    for (let s = 0; s < streamCount; s += 1) {
+      const hex = palette[s % palette.length];
+      const mat = new THREE.PointsMaterial({
+        color: hex,
+        size: Math.max(0.028, 0.034 + i * 0.012),
+        transparent: true,
+        opacity: Math.min(0.95, 0.42 + i * 0.14),
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      });
+      const positions = new Float32Array(dotsPerStream * 3);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const pts = new THREE.Points(geo, mat);
+      pts.frustumCulled = false;
+      group.add(pts);
+      streams.push({
+        pts,
+        positions,
+        material: mat,
+        baseOpacity: mat.opacity,
+        xOff: (Math.random() - 0.5) * 0.12,
+        phaseOff: Math.random(),
+        wobble: 0.6 + Math.random() * 0.8,
+        dotCount: dotsPerStream,
+      });
+    }
+
+    trailEvents.push({
+      kind: 'dropGuide',
+      group,
+      streams,
+      span,
+      life: 0,
+      maxLife: Math.min(0.95, 0.42 + span * 0.08),
+      flowPhase: 0,
+      flowSpeed: Math.max(1.2, 2.4 + i * 0.5),
+    });
   }
 
   function addOrbitTrailEvent(worldX, worldY, worldZ, color, intensity = 1, style = 'full', options = {}) {
@@ -837,6 +929,30 @@ export function createJuice(scene, options = {}) {
           item.points.rotation.z = Math.sin(ev.life * item.wobbleSpeed + item.wobblePhase) * 0.035;
           item.points.geometry.attributes.position.needsUpdate = true;
           item.material.opacity = Math.max(0, item.baseOpacity * fade * pulse);
+        }
+        if (u >= 1) {
+          disposeTrailEvent(ev);
+          trailEvents.splice(i, 1);
+        }
+        continue;
+      }
+      if (ev.kind === 'dropGuide') {
+        const u = Math.min(1, ev.life / ev.maxLife);
+        const fade = 1 - u;
+        ev.flowPhase += dt * ev.flowSpeed;
+        const span = ev.span;
+        for (const s of ev.streams) {
+          const pos = s.positions;
+          const n = s.dotCount;
+          for (let d = 0; d < n; d += 1) {
+            const p = (ev.flowPhase * 1.1 + s.phaseOff + d / n) % 1;
+            const yLocal = span * (1 - p);
+            pos[d * 3 + 0] = s.xOff + Math.sin(ev.life * 7.2 + d * 0.6 + s.wobble) * 0.042;
+            pos[d * 3 + 1] = yLocal;
+            pos[d * 3 + 2] = Math.cos(ev.life * 5.4 + d * 0.4) * 0.05;
+          }
+          s.pts.geometry.attributes.position.needsUpdate = true;
+          s.material.opacity = Math.max(0, s.baseOpacity * fade * fade);
         }
         if (u >= 1) {
           disposeTrailEvent(ev);
@@ -1605,6 +1721,7 @@ export function createJuice(scene, options = {}) {
     playFxProfileStack,
     setFxConfig,
     getFxConfig,
+    addDropGuideTrail,
     updateParticles,
     computePileStress,
     updateDangerLine,

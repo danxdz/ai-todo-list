@@ -83,6 +83,9 @@ export function mountFxMiniPreview(host, initialPayload = {}) {
   let raf = 0;
   let lastTs = 0;
   let pulse = 0;
+  let moleculeRest = null;
+  let moleculeFormStart = null;
+  let moleculeFormation = null;
   let payload = {
     kind: 'merge',
     intensity: 1,
@@ -125,15 +128,26 @@ export function mountFxMiniPreview(host, initialPayload = {}) {
       atomC.group.visible = true;
       atomC.group.position.set(0, 0.42, 0.02);
       product.group.position.set(0, 0.04, -0.04);
+      moleculeRest = {
+        a: new THREE.Vector3(-0.54, -0.12, 0.03),
+        b: new THREE.Vector3(0.54, -0.12, 0.03),
+        c: new THREE.Vector3(0, 0.42, 0.02),
+        p: new THREE.Vector3(0, 0.04, -0.04),
+      };
       return;
     }
 
     atomA.group.position.set(-0.64, 0, 0.03);
     atomB.group.position.set(0.64, 0, 0.03);
     atomC.group.visible = false;
+    moleculeRest = null;
+    moleculeFormation = null;
+    moleculeFormStart = null;
   }
 
   function applyPayload(nextPayload = {}) {
+    moleculeFormation = null;
+    moleculeFormStart = null;
     payload = {
       ...payload,
       ...(nextPayload ?? {}),
@@ -144,8 +158,30 @@ export function mountFxMiniPreview(host, initialPayload = {}) {
     layout(String(payload.kind ?? 'merge').toLowerCase());
   }
 
-  function trigger(nextPayload = {}) {
-    applyPayload(nextPayload);
+  function spreadMoleculeAtomsForFormation() {
+    if (!moleculeRest) return;
+    const cx = (moleculeRest.a.x + moleculeRest.b.x + moleculeRest.c.x) / 3;
+    const cy = (moleculeRest.a.y + moleculeRest.b.y + moleculeRest.c.y) / 3;
+    const cz = (moleculeRest.a.z + moleculeRest.b.z + moleculeRest.c.z) / 3;
+    const spread = 0.94;
+    const push = (v) => {
+      const dx = v.x - cx;
+      const dy = v.y - cy;
+      const dz = v.z - cz;
+      const len = Math.max(0.0001, Math.hypot(dx, dy, dz));
+      return new THREE.Vector3(v.x + (dx / len) * spread, v.y + (dy / len) * spread, v.z + (dz / len) * spread);
+    };
+    moleculeFormStart = {
+      a: push(moleculeRest.a),
+      b: push(moleculeRest.b),
+      c: push(moleculeRest.c),
+    };
+    atomA.group.position.copy(moleculeFormStart.a);
+    atomB.group.position.copy(moleculeFormStart.b);
+    atomC.group.position.copy(moleculeFormStart.c);
+  }
+
+  function runTriggerEffects() {
     const kind = String(payload.kind ?? 'merge').toLowerCase();
     const profile = payload.profile && typeof payload.profile === 'object' ? payload.profile : {};
     const hasStack = Array.isArray(profile?.stackEntries) && profile.stackEntries.length > 0;
@@ -256,6 +292,18 @@ export function mountFxMiniPreview(host, initialPayload = {}) {
     });
   }
 
+  function trigger(nextPayload = {}) {
+    applyPayload(nextPayload);
+    const kind = String(payload.kind ?? 'merge').toLowerCase();
+    if ((kind === 'molecule' || kind === 'water') && moleculeRest) {
+      spreadMoleculeAtomsForFormation();
+      moleculeFormation = { t: 0, fired: false };
+      pulse = 0.14;
+      return;
+    }
+    runTriggerEffects();
+  }
+
   function tick(ts) {
     if (!live) return;
     const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
@@ -263,6 +311,25 @@ export function mountFxMiniPreview(host, initialPayload = {}) {
     pulse = Math.max(0, pulse - dt);
     const t = ts * 0.001;
     stage.rotation.y = Math.sin(t * 0.5) * 0.08;
+
+    if (moleculeFormation && moleculeRest && moleculeFormStart) {
+      moleculeFormation.t += dt;
+      const dur = 0.42;
+      const te = Math.min(1, moleculeFormation.t / dur);
+      const ease = 1 - (1 - te) * (1 - te);
+      atomA.group.position.lerpVectors(moleculeFormStart.a, moleculeRest.a, ease);
+      atomB.group.position.lerpVectors(moleculeFormStart.b, moleculeRest.b, ease);
+      atomC.group.position.lerpVectors(moleculeFormStart.c, moleculeRest.c, ease);
+      if (!moleculeFormation.fired && moleculeFormation.t >= 0.2) {
+        moleculeFormation.fired = true;
+        runTriggerEffects();
+      }
+      if (te >= 1) {
+        moleculeFormation = null;
+        moleculeFormStart = null;
+      }
+    }
+
     product.core.material.opacity = 0.18 + pulse * 0.32;
     product.halo.material.opacity = 0.06 + pulse * 0.14;
     product.group.scale.setScalar(1 + pulse * 0.22);

@@ -12,6 +12,7 @@ export const ATOM_FX_DEFAULTS = {
   trailDensity: 1,
   dropletDensity: 1,
   bondLinkIntensity: 1,
+  dropTrailDensity: 1,
 };
 export const ATOM_FX_PRIMITIVE_TYPES = [
   'burst',
@@ -239,19 +240,19 @@ export const ATOM_FX_PROFILE_DEFAULTS = {
     name: 'Collision Same Pop',
     scope: 'merge',
     enabled: true,
-    burstScale: 0.82,
-    sparkScale: 1.1,
+    burstScale: 0.46,
+    sparkScale: 0.18,
     dropletScale: 1,
     bondScale: 0.92,
-    smokeScale: 0.18,
-    shatterScale: 0.14,
-    trailScale: 0.18,
-    explosionScale: 0.4,
-    hitPauseScale: 0.42,
-    vibrateScale: 0.3,
+    smokeScale: 0.08,
+    shatterScale: 0.08,
+    trailScale: 0.08,
+    explosionScale: 0.18,
+    hitPauseScale: 0.3,
+    vibrateScale: 0.18,
     trailStyle: 'lite',
     elementalMode: 'auto',
-    stack: ['sparks_clean', 'orbit_electron_merge'],
+    stack: ['orbit_electron_merge'],
   },
   collision_other_flash: {
     id: 'collision_other_flash',
@@ -338,9 +339,9 @@ function defaultLayerTemplate() {
       id: 'global_core',
       type: 'core',
       enabled: true,
-      sizePct: 72,
+      sizePct: 70,
       opacityPct: 100,
-      glowPct: 8,
+      glowPct: 12,
       spinPct: 0,
       thicknessPct: 0,
       count: 1,
@@ -349,9 +350,9 @@ function defaultLayerTemplate() {
       id: 'global_nucleus',
       type: 'nucleus',
       enabled: true,
-      sizePct: 18,
-      opacityPct: 90,
-      glowPct: 34,
+      sizePct: 20,
+      opacityPct: 96,
+      glowPct: 42,
       spinPct: 0,
       thicknessPct: 0,
       count: 1,
@@ -360,10 +361,10 @@ function defaultLayerTemplate() {
       id: 'global_cloud',
       type: 'cloud',
       enabled: true,
-      sizePct: 100,
-      opacityPct: 8,
-      glowPct: 16,
-      spinPct: 22,
+      sizePct: 106,
+      opacityPct: 11,
+      glowPct: 22,
+      spinPct: 26,
       thicknessPct: 0,
       count: 1,
     },
@@ -371,24 +372,24 @@ function defaultLayerTemplate() {
       id: 'global_shell',
       type: 'shell',
       enabled: true,
-      sizePct: 112,
-      opacityPct: 16,
-      glowPct: 14,
-      spinPct: 44,
-      thicknessPct: 20,
-      count: 2,
-      orbitRadiusPct: 100,
-      spreadPct: 36,
-      tiltPct: 58,
+      sizePct: 118,
+      opacityPct: 24,
+      glowPct: 22,
+      spinPct: 54,
+      thicknessPct: 18,
+      count: 3,
+      orbitRadiusPct: 108,
+      spreadPct: 42,
+      tiltPct: 68,
     },
     {
       id: 'global_halo',
       type: 'halo',
       enabled: true,
-      sizePct: 128,
-      opacityPct: 12,
-      glowPct: 20,
-      spinPct: 18,
+      sizePct: 132,
+      opacityPct: 16,
+      glowPct: 26,
+      spinPct: 22,
       thicknessPct: 0,
       count: 1,
     },
@@ -661,6 +662,16 @@ function sanitizeMoleculePresentation(presentation) {
   const sparkCount = toFiniteNumber(presentation.sparkCount);
   if (sparkCount != null) out.sparkCount = Math.round(clamp(sparkCount, 3, 56));
   if (typeof presentation.showWorldEntity === 'boolean') out.showWorldEntity = presentation.showWorldEntity;
+  clampField('formationZoomPeak', 1, 1.42);
+  clampField('formationZoomInEnd', 0.18, 0.52);
+  clampField('formationZoomHoldEnd', 0.35, 0.82);
+  if (
+    out.formationZoomInEnd != null &&
+    out.formationZoomHoldEnd != null &&
+    out.formationZoomHoldEnd <= out.formationZoomInEnd
+  ) {
+    out.formationZoomHoldEnd = Math.min(0.82, out.formationZoomInEnd + 0.12);
+  }
   return Object.keys(out).length > 0 ? out : null;
 }
 
@@ -764,6 +775,7 @@ function sanitizeFxConfig(value) {
     trailDensity: read('trailDensity'),
     dropletDensity: read('dropletDensity'),
     bondLinkIntensity: read('bondLinkIntensity'),
+    dropTrailDensity: read('dropTrailDensity'),
   };
 }
 

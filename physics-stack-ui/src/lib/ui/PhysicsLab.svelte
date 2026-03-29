@@ -2038,7 +2038,47 @@
                 oninput={(event) => patchMoleculePresentation({ sparkCount: Number((event.currentTarget as HTMLInputElement).value) })}
               />
             </label>
+            <label class="field">
+              <span>Formation zoom peak</span>
+              <input
+                type="range"
+                min="1"
+                max="1.42"
+                step="0.01"
+                value={selectedMoleculePresentation?.formationZoomPeak ?? 1.14}
+                oninput={(event) =>
+                  patchMoleculePresentation({ formationZoomPeak: Number((event.currentTarget as HTMLInputElement).value) })}
+              />
+            </label>
+            <label class="field">
+              <span>Formation zoom in by (time)</span>
+              <input
+                type="range"
+                min="0.18"
+                max="0.52"
+                step="0.01"
+                value={selectedMoleculePresentation?.formationZoomInEnd ?? 0.38}
+                oninput={(event) =>
+                  patchMoleculePresentation({ formationZoomInEnd: Number((event.currentTarget as HTMLInputElement).value) })}
+              />
+            </label>
+            <label class="field">
+              <span>Formation zoom hold until (time)</span>
+              <input
+                type="range"
+                min="0.35"
+                max="0.82"
+                step="0.01"
+                value={selectedMoleculePresentation?.formationZoomHoldEnd ?? 0.55}
+                oninput={(event) =>
+                  patchMoleculePresentation({ formationZoomHoldEnd: Number((event.currentTarget as HTMLInputElement).value) })}
+              />
+            </label>
           </div>
+          <p class="formula-note">
+            Formation zoom scales the in-world molecule ghost only (atoms converging + local zoom). The main camera does not move.
+            Time is 0–1 across the formation duration. “Zoom in by” also sets when atoms finish easing together.
+          </p>
           <p class="formula-note">
             Molecule color is derived automatically from atom colors.
           </p>
@@ -2289,6 +2329,17 @@
                   step="0.01"
                   value={visualState?.fx?.trailDensity ?? 1}
                   oninput={(event) => patchFx({ trailDensity: Number((event.currentTarget as HTMLInputElement).value) })}
+                />
+              </label>
+              <label class="field">
+                <span>Drop guide</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.2"
+                  step="0.01"
+                  value={visualState?.fx?.dropTrailDensity ?? 1}
+                  oninput={(event) => patchFx({ dropTrailDensity: Number((event.currentTarget as HTMLInputElement).value) })}
                 />
               </label>
               <label class="field">

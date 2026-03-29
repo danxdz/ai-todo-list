@@ -442,47 +442,56 @@ export const MOLECULE_RECIPES = [
 ];
 
 const MOLECULE_FX_PRESET_DEFAULT = {
-  atomScale: 0.42,
+  atomScale: 0.56,
   maxAtoms: 5,
-  burstRadius: 0.56,
-  startScale: 0.76,
-  peakScale: 1.28,
-  duration: 1.04,
-  rise: 0.3,
-  floatWave: 0.05,
-  spinSpeed: 1.3,
-  fadeStart: 0.42,
-  smokeAt: 0.5,
+  burstRadius: 0.72,
+  startScale: 0.88,
+  peakScale: 1.68,
+  duration: 1.14,
+  rise: 0.18,
+  floatWave: 0.035,
+  spinSpeed: 1.6,
+  fadeStart: 0.34,
+  smokeAt: 0.46,
   smokeCount: 12,
-  finalShatterAt: 0.8,
-  finalShatter: 10,
-  sparkCount: 14,
+  finalShatterAt: 0.76,
+  finalShatter: 14,
+  sparkCount: 18,
+  showWorldEntity: true,
+  /** Extra scale on the in-world formation group only (camera unchanged). */
+  formationZoomPeak: 1.14,
+  /** Normalized time (0–1) when formation zoom / atom converge finishes easing in. */
+  formationZoomInEnd: 0.38,
+  /** Normalized time when peak hold ends and zoom eases back toward 1. */
+  formationZoomHoldEnd: 0.55,
 };
 
 const MOLECULE_FX_PRESET_BY_ID = {
   water: {
-    atomScale: 0.46,
+    atomScale: 0.6,
     maxAtoms: 5,
-    burstRadius: 0.62,
-    duration: 1.08,
+    burstRadius: 0.78,
+    peakScale: 1.74,
+    duration: 1.16,
     smokeCount: 16,
     sparkCount: 18,
   },
   methane: {
-    atomScale: 0.44,
+    atomScale: 0.58,
     maxAtoms: 6,
-    burstRadius: 0.64,
-    duration: 1.02,
+    burstRadius: 0.8,
+    peakScale: 1.78,
+    duration: 1.1,
     finalShatter: 16,
     sparkCount: 20,
   },
   glucose: {
-    atomScale: 0.36,
+    atomScale: 0.46,
     maxAtoms: 8,
-    burstRadius: 0.84,
-    peakScale: 1.46,
-    duration: 1.28,
-    rise: 0.42,
+    burstRadius: 0.94,
+    peakScale: 1.9,
+    duration: 1.34,
+    rise: 0.24,
     smokeCount: 24,
     finalShatter: 28,
     sparkCount: 26,
@@ -532,21 +541,21 @@ export const DROP_VY_PER_LEVEL = 0.028;
 export const DROP_VY_LEVEL_CAP = 0.38;
 
 export const ATOM_VISUAL_DEFAULTS = {
-  coreScale: 0.74,
-  nucleusScale: 0.2,
+  coreScale: 0.72,
+  nucleusScale: 0.22,
   nucleusOpacity: 0.96,
-  nucleusEmissive: 0.3,
-  cloudScale: 1.08,
-  cloudOpacity: 0.06,
-  cloudGlow: 0.14,
-  cloudSpin: 0.28,
-  electronCount: 3,
-  electronSpeed: 0.48,
-  shellCount: 3,
-  shellRadius: 1.08,
-  shellThickness: 0.01,
-  shellOpacity: 0.13,
-  shellSpin: 0.52,
+  nucleusEmissive: 0.38,
+  cloudScale: 1.12,
+  cloudOpacity: 0.09,
+  cloudGlow: 0.2,
+  cloudSpin: 0.36,
+  electronCount: 4,
+  electronSpeed: 0.68,
+  shellCount: 4,
+  shellRadius: 1.14,
+  shellThickness: 0.013,
+  shellOpacity: 0.2,
+  shellSpin: 0.72,
 };
 
 function clamp(v, min, max) {
@@ -595,15 +604,15 @@ export function getAtomVisualProfile(spec) {
   out.haloColor = mixColor(baseColor, 0xffffff, 0.62);
 
   if (phase === 'gas') {
-    out.coreScale = 0.72;
-    out.cloudScale = 1.12;
-    out.cloudOpacity = 0.12;
-    out.cloudGlow = 0.12;
-    out.nucleusScale = 0.11;
+    out.coreScale = 0.68;
+    out.cloudScale = 1.18;
+    out.cloudOpacity = 0.14;
+    out.cloudGlow = 0.18;
+    out.nucleusScale = 0.1;
     out.nucleusOpacity = 0.54;
-    out.shellCount = Math.max(out.shellCount, 2);
-    out.shellOpacity = 0.22;
-    out.shellSpin = 0.42;
+    out.shellCount = Math.max(out.shellCount, 3);
+    out.shellOpacity = 0.26;
+    out.shellSpin = 0.64;
   } else if (phase === 'liquid') {
     out.coreScale = 0.82;
     out.cloudScale = 1.02;
@@ -614,13 +623,13 @@ export function getAtomVisualProfile(spec) {
   }
 
   if (family === 'noble-gas') {
-    out.cloudScale += 0.08;
-    out.cloudOpacity += 0.04;
-    out.cloudGlow += 0.06;
+    out.cloudScale += 0.1;
+    out.cloudOpacity += 0.05;
+    out.cloudGlow += 0.08;
     out.nucleusScale = Math.max(0.12, out.nucleusScale - 0.02);
     out.nucleusEmissive += 0.1;
-    out.shellCount = Math.max(out.shellCount, 2);
-    out.shellOpacity += 0.05;
+    out.shellCount = Math.max(out.shellCount, 3);
+    out.shellOpacity += 0.08;
   } else if (family === 'transition-metal') {
     out.coreScale += 0.06;
     out.cloudScale -= 0.08;
@@ -630,10 +639,10 @@ export function getAtomVisualProfile(spec) {
     out.shellCount = 1;
     out.shellSpin *= 0.85;
   } else if (family === 'halogen') {
-    out.cloudOpacity += 0.03;
-    out.cloudGlow += 0.04;
-    out.shellCount = Math.max(out.shellCount, 3);
-    out.shellSpin += 0.08;
+    out.cloudOpacity += 0.04;
+    out.cloudGlow += 0.06;
+    out.shellCount = Math.max(out.shellCount, 4);
+    out.shellSpin += 0.12;
   }
 
   if (z <= 2) {

@@ -1,3 +1,6 @@
+# Static Site: Render serves `render-deploy/` directly — do not set a Start Command.
+# If you instead create a "Web Service", use Start Command: npm run start (after build)
+# and the Vite preview server binds 0.0.0.0:$PORT via vite.config.ts.
 services:
   - type: web
     name: periodic-stack

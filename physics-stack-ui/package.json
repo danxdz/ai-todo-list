@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:render": "vite build --outDir render-deploy",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "release:check": "npm run check && npm run build",
+    "render:check": "npm run check && npm run build:render",
     "cap:add:android": "cap add android",
     "cap:add:ios": "cap add ios",
     "cap:sync": "cap sync",
@@ -17,6 +19,8 @@
     "cap:doctor": "cap doctor",
     "release:android": "npm run release:check && npm run cap:sync:android",
     "release:ios": "npm run release:check && npm run cap:sync:ios",
+    "cap:android:update": "npm run build && npm run cap:sync:android && npm run cap:android",
+    "cap:ios:update": "npm run build && npm run cap:sync:ios && npm run cap:ios",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios"
   },

@@ -30,6 +30,9 @@ const ATOMIC_WEIGHT_U = {
 };
 
 const H_MASS = ATOMIC_WEIGHT_U[1];
+const ATOM_MASS_SOFT_EXP = 0.23;
+const ATOM_MASS_MIN_RATIO = 0.92;
+const ATOM_MASS_MAX_RATIO = 3.6;
 
 /**
  * @param {number} radius
@@ -57,10 +60,15 @@ export function fruitMassForRadius(r) {
  */
 export function massForFruitSpec(spec) {
   if (typeof spec?.atomicMass === 'number' && Number.isFinite(spec.atomicMass) && spec.atomicMass > 0) {
-    // Use a softened scientific scaling: preserves ordering but avoids destabilizing
-    // 2D pile physics when very heavy nuclei collide.
+    // Gameplay-safe atomic scaling:
+    // - preserves real ordering from atomic masses
+    // - keeps stack compression sane by heavily compressing the dynamic range
+    //   (radius already scales with atomic mass in config-atoms.js)
     const rawRatio = spec.atomicMass / H_MASS;
-    const softened = Math.min(48, Math.pow(rawRatio, 0.74));
+    const softened = Math.max(
+      ATOM_MASS_MIN_RATIO,
+      Math.min(ATOM_MASS_MAX_RATIO, Math.pow(rawRatio, ATOM_MASS_SOFT_EXP)),
+    );
     return massForBall(spec.radius, softened);
   }
   if (spec?.atomicNumber != null) {

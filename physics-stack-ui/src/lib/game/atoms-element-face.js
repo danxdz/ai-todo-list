@@ -50,7 +50,10 @@ export function drawElementFace2d(ctx, size, spec) {
   g.addColorStop(1, rgbStr(lo));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
-  drawAtomShells2d(ctx, s / 2, s / 2, spec.atomicNumber ?? 0, mid);
+  const showBohrFace = spec?.visual?.bohrFace === true;
+  if (showBohrFace) {
+    drawAtomShells2d(ctx, s / 2, s / 2, spec.atomicNumber ?? 0, mid);
+  }
 
   const phase = spec.phase ?? 'solid';
   const family = spec.family ?? 'nonmetal';
@@ -87,11 +90,13 @@ export function drawElementFace2d(ctx, size, spec) {
     }
   }
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-  ctx.lineWidth = Math.max(1, s * 0.012);
-  ctx.beginPath();
-  ctx.arc(s / 2, s / 2, s * 0.38, 0, Math.PI * 2);
-  ctx.stroke();
+  if (showBohrFace) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = Math.max(1, s * 0.012);
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s * 0.38, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   const sym = spec.symbol || '?';
   const fs = sym.length > 2 ? s * 0.2 : s * 0.24;
   ctx.shadowColor = 'rgba(0,0,0,0.5)';

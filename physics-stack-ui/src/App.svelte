@@ -3,61 +3,156 @@
   import CollectionAlbum from './lib/ui/CollectionAlbum.svelte';
   import DailyRewards from './lib/ui/DailyRewards.svelte';
   import Shop from './lib/ui/Shop.svelte';
+  import PhysicsLab from './lib/ui/PhysicsLab.svelte';
   import { RELEASE_FLAGS } from './lib/release-flags.js';
   import { locale, localeOptions, setLocale, t } from './lib/app-i18n';
   import type { GameMode } from './lib/types';
+  import {
+    getAtomWorld,
+    getAtomWorldCards,
+    loadAtomWorldProgress,
+    resolvePlayableAtomWorldId,
+    selectAtomWorld,
+  } from './lib/game/atom-worlds.js';
 
-  type Screen = 'home' | 'game' | 'collection' | 'daily' | 'shop';
+  type Screen = 'home' | 'game' | 'collection' | 'daily' | 'shop' | 'physicsLab';
 
   const allModes: GameMode[] = ['atoms', 'numbers', 'fruit'];
   const releaseModes: GameMode[] = RELEASE_FLAGS.atomsFocus ? ['atoms'] : allModes;
   const modeKeys: GameMode[] = RELEASE_FLAGS.showExperimentalModes ? allModes : releaseModes;
 
-  let screen: Screen = 'home';
-  let activeMode: GameMode = modeKeys[0] ?? 'atoms';
+  function getBootScreen(): Screen {
+    if (typeof window === 'undefined') return 'home';
+    const qp = new URLSearchParams(window.location.search);
+    if (qp.get('lab') === '1') return 'physicsLab';
+    if (qp.get('play') === '1') return 'game';
+    return 'home';
+  }
+
+  function getBootMode(): GameMode {
+    if (typeof window === 'undefined') return modeKeys[0] ?? 'atoms';
+    const qp = new URLSearchParams(window.location.search);
+    const mode = qp.get('mode');
+    if (mode === 'atoms' || mode === 'numbers' || mode === 'fruit') return mode;
+    return modeKeys[0] ?? 'atoms';
+  }
+
+  function getBootWorldId(): string | null {
+    if (typeof window === 'undefined') return null;
+    const qp = new URLSearchParams(window.location.search);
+    return qp.get('world');
+  }
+
+  let screen = $state<Screen>(getBootScreen());
+  let activeMode = $state<GameMode>(getBootMode());
+  let atomWorldProgress = $state(loadAtomWorldProgress());
+  let activeAtomWorldId = $state(resolvePlayableAtomWorldId(getBootWorldId(), loadAtomWorldProgress()));
+  let returnToGameOnBack = $state(false);
 
   function openMode(mode: GameMode) {
     activeMode = mode;
+    if (mode === 'atoms') {
+      activeAtomWorldId = resolvePlayableAtomWorldId(activeAtomWorldId, atomWorldProgress);
+      atomWorldProgress = selectAtomWorld(activeAtomWorldId);
+    }
     screen = 'game';
   }
 
   function goHome() {
+    atomWorldProgress = loadAtomWorldProgress();
+    activeAtomWorldId = resolvePlayableAtomWorldId(activeAtomWorldId, atomWorldProgress);
+    returnToGameOnBack = false;
     screen = 'home';
   }
 
-  $: currentLocale = $locale;
-  $: modeCards = modeKeys.map((mode) => ({
-    mode,
-    title: t(`mode.${mode}.title`, undefined, currentLocale),
-    tag: t(`mode.${mode}.tag`, undefined, currentLocale),
-  }));
-  $: singleModeFlow = modeCards.length <= 1;
+  function openCollection(fromGame = false) {
+    returnToGameOnBack = fromGame;
+    screen = 'collection';
+  }
 
-  $: activeModeTitle = t(`mode.${activeMode}.title`, undefined, currentLocale);
+  function openDaily(fromGame = false) {
+    returnToGameOnBack = fromGame;
+    screen = 'daily';
+  }
+
+  function openShop(fromGame = false) {
+    returnToGameOnBack = fromGame;
+    screen = 'shop';
+  }
+
+  function backFromSubmenu() {
+    if (returnToGameOnBack) {
+      returnToGameOnBack = false;
+      screen = 'game';
+      return;
+    }
+    goHome();
+  }
+
+  function openPhysicsLabTab() {
+    if (typeof window === 'undefined') return;
+    const url = `${window.location.origin}${window.location.pathname}?lab=1`;
+    window.open(url, '_blank', 'noopener');
+  }
+
+  function pickAtomWorld(worldId: string) {
+    atomWorldProgress = selectAtomWorld(worldId);
+    activeAtomWorldId = resolvePlayableAtomWorldId(worldId, atomWorldProgress);
+  }
+
+  const currentLocale = $derived($locale);
+  const modeCards = $derived(
+    modeKeys.map((mode) => ({
+      mode,
+      title: t(`mode.${mode}.title`, undefined, currentLocale),
+      tag: t(`mode.${mode}.tag`, undefined, currentLocale),
+    })),
+  );
+  const singleModeFlow = $derived(modeCards.length <= 1);
+  const activeModeTitle = $derived(t(`mode.${activeMode}.title`, undefined, currentLocale));
+  const atomWorldCards = $derived(getAtomWorldCards(atomWorldProgress));
+  const activeAtomWorld = $derived(getAtomWorld(activeAtomWorldId));
 </script>
 
 {#if screen === 'game'}
-  <GameCanvas mode={activeMode} onExit={goHome} />
+  <GameCanvas
+    mode={activeMode}
+    worldId={activeMode === 'atoms' ? activeAtomWorldId : ''}
+    onExit={goHome}
+    onOpenCollection={() => openCollection(true)}
+    onOpenDaily={() => openDaily(true)}
+    onOpenShop={() => openShop(true)}
+    canOpenShop={RELEASE_FLAGS.enableShopEntry}
+    onWorldProgress={() => {
+      atomWorldProgress = loadAtomWorldProgress();
+      activeAtomWorldId = resolvePlayableAtomWorldId(activeAtomWorldId, atomWorldProgress);
+    }}
+  />
 {:else if screen === 'collection'}
-  <CollectionAlbum onBack={goHome} onPlayAtoms={() => openMode('atoms')} />
+  <CollectionAlbum onBack={backFromSubmenu} onPlayAtoms={() => openMode('atoms')} />
 {:else if screen === 'daily'}
-  <DailyRewards onBack={goHome} onPlay={() => openMode(activeMode)} />
+  <DailyRewards onBack={backFromSubmenu} onPlay={() => openMode(activeMode)} />
 {:else if screen === 'shop' && RELEASE_FLAGS.enableShopEntry}
-  <Shop onBack={goHome} onPlay={() => openMode(activeMode)} />
+  <Shop onBack={backFromSubmenu} onPlay={() => openMode(activeMode)} />
+{:else if screen === 'physicsLab'}
+  <PhysicsLab onBack={goHome} />
 {:else}
-  <main class="menu-shell">
+  <main class={`menu-shell mode-${activeMode} world-${activeAtomWorldId}`}>
     <section class="entry-card">
       <header class="entry-top">
         <div class="entry-title">
           <h1>{t('home.title', undefined, currentLocale)}</h1>
-          <span class="entry-badge">{activeModeTitle}</span>
+          <span class="entry-badge">
+            {activeModeTitle}
+            {#if activeMode === 'atoms'} · {activeAtomWorld.label}{/if}
+          </span>
         </div>
         <label class="locale-picker" for="home-locale">
           <span>{t('common.language', undefined, currentLocale)}</span>
           <select
             id="home-locale"
             value={$locale}
-            on:change={(event) => setLocale((event.currentTarget as HTMLSelectElement).value)}
+            onchange={(event) => setLocale((event.currentTarget as HTMLSelectElement).value)}
           >
             {#each localeOptions as option}
               <option value={option.value}>{option.label}</option>
@@ -76,7 +171,7 @@
           {#each modeCards as card}
             <button
               class={`mode-card ${card.mode} ${activeMode === card.mode ? 'selected' : ''}`}
-              on:click={() => (activeMode = card.mode)}
+              onclick={() => (activeMode = card.mode)}
             >
               <span class="mode-tag">{card.tag}</span>
               <strong>{card.title}</strong>
@@ -85,31 +180,55 @@
         </section>
       {/if}
 
-      <button class="play-btn" on:click={() => openMode(activeMode)}>
+      {#if activeMode === 'atoms'}
+        <section class="world-grid" aria-label="Atom worlds">
+          {#each atomWorldCards as world}
+            <button
+              class={`world-card ${world.selected ? 'selected' : ''}`}
+              disabled={!world.unlocked}
+              onclick={() => pickAtomWorld(world.id)}
+            >
+              <strong>{world.label}</strong>
+              <span>{world.mechanic.replace('_', ' ')}</span>
+              {#if !world.unlocked}
+                <small>{world.unlockHint}</small>
+              {/if}
+            </button>
+          {/each}
+        </section>
+      {/if}
+
+      <button class="play-btn" onclick={() => openMode(activeMode)}>
         {t('common.playNow', undefined, currentLocale)}
       </button>
 
       <div class="quick-links">
-        <button class="ghost-btn" on:click={() => (screen = 'collection')}>
+        <button class="ghost-btn" onclick={() => openCollection(false)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7.3A2.3 2.3 0 0 1 6.3 5h4.2A2.3 2.3 0 0 1 12.8 7.3v9.4a2.3 2.3 0 0 1-2.3 2.3H6.3A2.3 2.3 0 0 1 4 16.7zM14.2 7.3A2.3 2.3 0 0 1 16.5 5h1.2A2.3 2.3 0 0 1 20 7.3v9.4a2.3 2.3 0 0 1-2.3 2.3h-1.2a2.3 2.3 0 0 1-2.3-2.3z" />
           </svg>
           {t('home.collection', undefined, currentLocale)}
         </button>
-        <button class="ghost-btn" on:click={() => (screen = 'daily')}>
+        <button class="ghost-btn" onclick={() => openDaily(false)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 4v2M17 4v2M5.5 7h13A1.5 1.5 0 0 1 20 8.5v9A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-9A1.5 1.5 0 0 1 5.5 7M4 10h16" />
           </svg>
           {t('home.daily', undefined, currentLocale)}
         </button>
         {#if RELEASE_FLAGS.enableShopEntry}
-          <button class="ghost-btn" on:click={() => (screen = 'shop')}>
+          <button class="ghost-btn" onclick={() => openShop(false)}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 8h12l-1 11H7zm2-2a4 4 0 0 1 8 0" />
             </svg>
             {t('home.shop', undefined, currentLocale)}
           </button>
         {/if}
+        <button class="ghost-btn" onclick={openPhysicsLabTab}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5h8v2H8zM5 10h14v2H5zm3 5h8v2H8z" />
+          </svg>
+          Physics Lab
+        </button>
       </div>
     </section>
   </main>
@@ -126,13 +245,64 @@
       calc(14px + env(safe-area-inset-left));
     display: grid;
     place-items: center;
+    position: relative;
+    overflow: hidden;
+    --menu-bg-image: url('/background/micro_atoms_1.jpg');
+    --menu-bg-opacity: 0.5;
+    --menu-tint-a: rgba(8, 16, 28, 0.78);
+    --menu-tint-b: rgba(7, 16, 30, 0.92);
+    background: #071120;
+  }
+
+  .menu-shell::before,
+  .menu-shell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .menu-shell::before {
+    z-index: 0;
+    background-image: var(--menu-bg-image);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: var(--menu-bg-opacity);
+    filter: blur(3px) saturate(1.05);
+    transform: none;
+  }
+
+  .menu-shell::after {
+    z-index: 0;
     background:
-      radial-gradient(120% 80% at 16% 0%, rgba(255, 130, 86, 0.24), transparent 55%),
-      radial-gradient(120% 70% at 84% 100%, rgba(47, 195, 255, 0.22), transparent 60%),
-      linear-gradient(180deg, #050b15 0%, #071524 100%);
+      radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.64) 100%),
+      radial-gradient(120% 80% at 16% 0%, rgba(255, 130, 86, 0.14), transparent 55%),
+      radial-gradient(120% 70% at 84% 100%, rgba(47, 195, 255, 0.15), transparent 60%),
+      linear-gradient(180deg, var(--menu-tint-a) 0%, var(--menu-tint-b) 100%);
+  }
+
+  .menu-shell.world-reactive {
+    --menu-bg-image: url('/background/micro_atoms_3.jpg');
+    --menu-tint-a: rgba(45, 24, 13, 0.8);
+    --menu-tint-b: rgba(28, 15, 10, 0.92);
+  }
+
+  .menu-shell.world-metals {
+    --menu-bg-image: url('/background/micro_atoms_4.jpg');
+    --menu-tint-a: rgba(21, 31, 41, 0.8);
+    --menu-tint-b: rgba(12, 22, 34, 0.92);
+  }
+
+  .menu-shell.mode-numbers {
+    --menu-bg-image: url('/background/micro_atoms_2.jpg');
+    --menu-tint-a: rgba(20, 18, 30, 0.8);
+    --menu-tint-b: rgba(14, 16, 30, 0.92);
   }
 
   .entry-card {
+    position: relative;
+    z-index: 1;
     width: min(620px, 100%);
     border-radius: 28px;
     border: 1px solid rgba(255, 255, 255, 0.14);
@@ -289,6 +459,58 @@
     margin-top: 6px;
     color: #f8fcff;
     font-size: 1.06rem;
+  }
+
+  .world-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .world-card {
+    cursor: pointer;
+    text-align: left;
+    border: 1px solid rgba(159, 239, 221, 0.24);
+    border-radius: 14px;
+    padding: 10px 12px;
+    background:
+      radial-gradient(circle at top right, rgba(105, 240, 210, 0.12), transparent 42%),
+      rgba(7, 24, 30, 0.62);
+    color: #ebfbff;
+    display: grid;
+    gap: 4px;
+  }
+
+  .world-card.selected {
+    border-color: rgba(156, 255, 230, 0.56);
+    box-shadow:
+      0 10px 22px rgba(0, 0, 0, 0.25),
+      inset 0 0 0 1px rgba(175, 255, 236, 0.25);
+    transform: translateY(-1px);
+  }
+
+  .world-card strong {
+    font-size: 0.98rem;
+  }
+
+  .world-card span {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(187, 234, 247, 0.78);
+  }
+
+  .world-card small {
+    font-size: 0.7rem;
+    color: rgba(222, 236, 247, 0.66);
+    line-height: 1.3;
+  }
+
+  .world-card:disabled {
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(9, 19, 30, 0.56);
+    color: rgba(218, 228, 238, 0.72);
   }
 
   .play-btn {

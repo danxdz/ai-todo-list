@@ -3,34 +3,60 @@
   import { locale, localeOptions, setLocale, t } from '../app-i18n';
   import type { GameMode } from '../types';
 
-  export let mode: GameMode;
-  export let onExit: () => void = () => {};
+  type Props = {
+    mode: GameMode;
+    worldId?: string;
+    onExit?: () => void;
+    onOpenCollection?: () => void;
+    onOpenDaily?: () => void;
+    onOpenShop?: () => void;
+    canOpenShop?: boolean;
+    onWorldProgress?: () => void;
+  };
+
+  let {
+    mode,
+    worldId = '',
+    onExit = () => {},
+    onOpenCollection = () => {},
+    onOpenDaily = () => {},
+    onOpenShop = () => {},
+    canOpenShop = false,
+    onWorldProgress = () => {},
+  }: Props = $props();
 
   let host: HTMLDivElement;
   let fxLayer: HTMLDivElement;
   let gameInstance: any;
-  let menuOpen = false;
-  let hintVisible = false;
-  let toast = '';
-  let toastTone = 'neutral';
-  let toastPlacement: 'bottom' | 'center' = 'bottom';
-  let moleculeWin = {
+  let menuOpen = $state(false);
+  let toast = $state('');
+  let toastTone = $state('neutral');
+  let moleculeWin = $state({
     open: false,
-    firstEver: false,
     formula: '',
     name: '',
     points: 0,
-    color: 0x88bbff,
-    atoms: [] as Array<{ symbol: string; color: number; count: number }>,
-  };
-  let overlay = {
+  });
+  let infoPanel = $state({
+    open: false,
+    title: '',
+    subtitle: '',
+    entries: [] as Array<{
+      id: string;
+      formula: string;
+      name: string;
+      combo: string;
+      points: number;
+    }>,
+  });
+  let overlay = $state({
     open: false,
     score: 0,
     level: 1,
     title: '',
     summary: '',
-  };
-  let hud = {
+  });
+  let hud = $state({
     score: 0,
     level: 1,
     levelGoal: 0,
@@ -42,33 +68,31 @@
     muted: false,
     title: '',
     themeId: 'marble',
-  };
+  });
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
   let moleculeTimer: ReturnType<typeof setTimeout> | null = null;
+  let infoTimer: ReturnType<typeof setTimeout> | null = null;
 
-  $: currentLocale = $locale;
+  const currentLocale = $derived($locale);
+  const worldClass = $derived(mode === 'atoms' && worldId ? `world-${worldId}` : '');
 
-  function pushToast(message: string, tone = 'neutral', placement: 'bottom' | 'center' = 'bottom') {
+  function pushToast(message: string, tone = 'neutral') {
     if (!message) return;
     toast = message;
     toastTone = tone;
-    toastPlacement = placement;
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
       toast = '';
-    }, 1700);
+    }, 1550);
   }
 
   function showMoleculeWin(payload: any) {
     const recipe = payload?.recipe ?? {};
     moleculeWin = {
       open: true,
-      firstEver: !!payload?.firstEver,
-      formula: recipe?.formula ?? '',
+      formula: payload?.formula ?? recipe?.formula ?? '',
       name: recipe?.name ?? '',
       points: Number(payload?.points ?? 0),
-      color: Number(recipe?.color ?? 0x88bbff),
-      atoms: Array.isArray(payload?.atoms) ? payload.atoms : [],
     };
     if (moleculeTimer) clearTimeout(moleculeTimer);
     moleculeTimer = setTimeout(() => {
@@ -76,31 +100,19 @@
     }, 2600);
   }
 
-  function moleculePreview(node: HTMLDivElement, payload: typeof moleculeWin) {
-    let mounted = true;
-    let cleanup: null | (() => void) = null;
-    let seq = 0;
-
-    async function render(nextPayload: typeof moleculeWin) {
-      const token = ++seq;
-      cleanup?.();
-      cleanup = null;
-      if (!nextPayload?.open) return;
-      const { mountMoleculeMiniPreview } = await import('../game/molecule-mini-preview.js');
-      if (!mounted || token !== seq || !nextPayload?.open) return;
-      cleanup = mountMoleculeMiniPreview(node, nextPayload);
-    }
-
-    render(payload);
-    return {
-      update(nextPayload: typeof moleculeWin) {
-        render(nextPayload);
-      },
-      destroy() {
-        mounted = false;
-        cleanup?.();
-      },
+  function showInfo(payload: any) {
+    if (!payload || payload.kind !== 'molecule-guide') return;
+    infoPanel = {
+      open: true,
+      title: payload?.title ?? '',
+      subtitle: payload?.subtitle ?? '',
+      entries: Array.isArray(payload?.entries) ? payload.entries : [],
     };
+    if (infoTimer) clearTimeout(infoTimer);
+    const duration = Math.max(1800, Number(payload?.durationMs ?? 5200));
+    infoTimer = setTimeout(() => {
+      infoPanel = { ...infoPanel, open: false };
+    }, duration);
   }
 
   async function mountGame() {
@@ -108,13 +120,13 @@
     gameInstance = createMergeGame({
       host,
       mode,
+      worldId,
       fxLayer,
       onHud: (nextHud: typeof hud) => {
         hud = nextHud;
       },
-      onToast: (message: string, tone = 'neutral', placement: 'bottom' | 'center' = 'bottom') =>
-        pushToast(message, tone, placement),
-      onInfo: (message: string) => pushToast(message, 'neutral'),
+      onToast: (message: string, tone = 'neutral') => pushToast(message, tone),
+      onInfo: (payload: any) => showInfo(payload),
       onGameOver: (nextOverlay: typeof overlay) => {
         overlay = { ...overlay, ...nextOverlay };
         if (nextOverlay.open) menuOpen = false;
@@ -122,6 +134,7 @@
       onMolecule: (payload: any) => {
         showMoleculeWin(payload);
       },
+      onWorldProgress,
     });
   }
 
@@ -135,19 +148,44 @@
     hud = { ...hud, muted };
   }
 
+  function openCollection() {
+    gameInstance?.commitProgress?.(true);
+    menuOpen = false;
+    onOpenCollection();
+  }
+
+  function openDaily() {
+    gameInstance?.commitProgress?.(true);
+    menuOpen = false;
+    onOpenDaily();
+  }
+
+  function openShop() {
+    gameInstance?.commitProgress?.(true);
+    menuOpen = false;
+    onOpenShop();
+  }
+
+  function exitRun() {
+    gameInstance?.commitProgress?.(true);
+    menuOpen = false;
+    onExit();
+  }
+
   onMount(() => {
     document.body.classList.add('merge-game', `theme-${mode}`);
     mountGame();
     return () => {
       if (toastTimer) clearTimeout(toastTimer);
       if (moleculeTimer) clearTimeout(moleculeTimer);
+      if (infoTimer) clearTimeout(infoTimer);
       gameInstance?.destroy?.();
       document.body.classList.remove('merge-game', `theme-${mode}`);
     };
   });
 </script>
 
-<div class={`game-shell ${hud.themeId}`}>
+<div class={`game-shell ${hud.themeId} ${mode} ${worldClass}`}>
   <div class="game-stage" bind:this={host}></div>
   <div class="float-layer" bind:this={fxLayer}></div>
 
@@ -155,22 +193,22 @@
     <div class="top-controls">
       <div class="run-pod">
         <div class="run-stat">
-          <span>Score</span>
+          <span>{t('common.score', undefined, currentLocale)}</span>
           <strong>{hud.score}</strong>
         </div>
         <span class="run-sep"></span>
         <div class="run-stat">
-          <span>Lvl</span>
+          <span>{t('common.level', undefined, currentLocale)}</span>
           <strong>{hud.level}</strong>
         </div>
       </div>
       <div class="top-actions">
-        <button class="mini-btn" on:click={toggleMute}>
+        <button class="mini-btn" onclick={toggleMute}>
           {hud.muted
             ? t('common.muted', undefined, currentLocale)
             : t('common.sound', undefined, currentLocale)}
         </button>
-        <button class="mini-btn" on:click={() => (menuOpen = !menuOpen)}>
+        <button class="mini-btn" onclick={() => (menuOpen = !menuOpen)}>
           {menuOpen
             ? t('common.close', undefined, currentLocale)
             : t('common.menu', undefined, currentLocale)}
@@ -179,22 +217,35 @@
     </div>
   </div>
 
-  {#if hintVisible && !menuOpen && !overlay.open}
-    <div class="start-hint">{t('game.startHint', undefined, currentLocale)}</div>
-  {/if}
-
   {#if toast}
-    <div class={`toast ${toastTone} ${toastPlacement}`}>{toast}</div>
+    <div class={`toast ${toastTone}`}>{toast}</div>
   {/if}
 
   {#if moleculeWin.open}
     <div class="molecule-win">
-      <div class="molecule-preview" use:moleculePreview={moleculeWin}></div>
-      <div class="molecule-copy">
-        <span class="molecule-kicker">{moleculeWin.firstEver ? 'New Molecule' : 'Molecule Bonus'}</span>
-        <strong>{moleculeWin.formula}</strong>
-        <small>{moleculeWin.name}</small>
-        <p>+{moleculeWin.points}</p>
+      <strong class="molecule-formula">{moleculeWin.formula}</strong>
+      {#if moleculeWin.name}
+        <p class="molecule-name">{moleculeWin.name}</p>
+      {/if}
+      <p class="molecule-points">+{moleculeWin.points}</p>
+    </div>
+  {/if}
+
+  {#if infoPanel.open && infoPanel.entries.length > 0}
+    <div class="chem-guide">
+      {#if infoPanel.title}
+        <strong class="chem-guide-title">{infoPanel.title}</strong>
+      {/if}
+      {#if infoPanel.subtitle}
+        <p class="chem-guide-subtitle">{infoPanel.subtitle}</p>
+      {/if}
+      <div class="chem-guide-list">
+        {#each infoPanel.entries as entry}
+          <div class="chem-guide-row">
+            <strong>{entry.formula}</strong>
+            <span>{entry.combo}</span>
+          </div>
+        {/each}
       </div>
     </div>
   {/if}
@@ -212,7 +263,7 @@
           <select
             id="pause-locale"
             value={$locale}
-            on:change={(event) => setLocale((event.currentTarget as HTMLSelectElement).value)}
+            onchange={(event) => setLocale((event.currentTarget as HTMLSelectElement).value)}
           >
             {#each localeOptions as option}
               <option value={option.value}>{option.label}</option>
@@ -220,18 +271,31 @@
           </select>
         </label>
         <div class="menu-actions">
-          <button class="primary" on:click={() => (menuOpen = false)}>
+          <button class="primary" onclick={() => (menuOpen = false)}>
             {t('common.resume', undefined, currentLocale)}
           </button>
-          <button class="ghost" on:click={restart}>{t('common.restart', undefined, currentLocale)}</button>
-          <button class="ghost" on:click={toggleMute}>
+          <button class="ghost" onclick={restart}>{t('common.restart', undefined, currentLocale)}</button>
+          <button class="ghost" onclick={toggleMute}>
             {hud.muted
               ? t('common.soundOff', undefined, currentLocale)
               : t('common.soundOn', undefined, currentLocale)}
           </button>
-          <button class="ghost danger" on:click={onExit}>
+          <button class="ghost danger" onclick={exitRun}>
             {t('common.exit', undefined, currentLocale)}
           </button>
+        </div>
+        <div class="menu-nav-links">
+          <button class="ghost slim" onclick={openCollection}>
+            {t('home.collection', undefined, currentLocale)}
+          </button>
+          <button class="ghost slim" onclick={openDaily}>
+            {t('home.daily', undefined, currentLocale)}
+          </button>
+          {#if canOpenShop}
+            <button class="ghost slim" onclick={openShop}>
+              {t('home.shop', undefined, currentLocale)}
+            </button>
+          {/if}
         </div>
       </div>
     </div>
@@ -250,10 +314,10 @@
           )}
         </p>
         <div class="menu-actions">
-          <button class="primary" on:click={restart}>
+          <button class="primary" onclick={restart}>
             {t('common.playAgain', undefined, currentLocale)}
           </button>
-          <button class="ghost" on:click={onExit}>
+          <button class="ghost" onclick={exitRun}>
             {t('common.returnHome', undefined, currentLocale)}
           </button>
         </div>
@@ -267,21 +331,71 @@
     position: relative;
     min-height: 100vh;
     overflow: hidden;
+    --bg-image: url('/background/micro_atoms_1.jpg');
+    --bg-image-opacity: 0.48;
+    --bg-tint-a: rgba(8, 18, 29, 0.74);
+    --bg-tint-b: rgba(6, 14, 24, 0.86);
+    background: #08131f;
+  }
+
+  .game-shell::before,
+  .game-shell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .game-shell::before {
+    z-index: 0;
+    background-image: var(--bg-image);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: var(--bg-image-opacity);
+    filter: blur(2.6px) saturate(1.04);
+    transform: none;
+  }
+
+  .game-shell::after {
+    z-index: 0;
     background:
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 24%),
-      linear-gradient(180deg, #08121d 0%, #0c1621 100%);
+      radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0.58) 100%),
+      radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.08), transparent 26%),
+      linear-gradient(180deg, var(--bg-tint-a) 0%, var(--bg-tint-b) 100%);
   }
 
   .game-shell.numbers {
-    background:
-      radial-gradient(circle at top left, rgba(255, 222, 89, 0.12), transparent 24%),
-      linear-gradient(180deg, #08121d 0%, #0d1626 100%);
+    --bg-image: url('/background/Lucid_Origin_soft_teal_blue_gradient_background_subtle_lightin_1.jpg');
+    --bg-image-opacity: 0.54;
+    --bg-tint-a: rgba(22, 22, 30, 0.76);
+    --bg-tint-b: rgba(18, 20, 30, 0.88);
   }
 
   .game-shell.atoms {
-    background:
-      radial-gradient(circle at top left, rgba(97, 255, 214, 0.12), transparent 24%),
-      linear-gradient(180deg, #071513 0%, #0b1719 100%);
+    --bg-image: url('/background/micro_atoms_2.jpg');
+    --bg-image-opacity: 0.5;
+    --bg-tint-a: rgba(9, 30, 27, 0.74);
+    --bg-tint-b: rgba(8, 20, 19, 0.88);
+  }
+
+  .game-shell.world-basics {
+    --bg-image: url('/background/micro_atoms_1.jpg');
+    --bg-image-opacity: 0.5;
+  }
+
+  .game-shell.world-reactive {
+    --bg-image: url('/background/micro_atoms_3.jpg');
+    --bg-image-opacity: 0.48;
+    --bg-tint-a: rgba(44, 22, 12, 0.74);
+    --bg-tint-b: rgba(33, 16, 10, 0.9);
+  }
+
+  .game-shell.world-metals {
+    --bg-image: url('/background/micro_atoms_4.jpg');
+    --bg-image-opacity: 0.5;
+    --bg-tint-a: rgba(22, 32, 42, 0.76);
+    --bg-tint-b: rgba(14, 24, 34, 0.9);
   }
 
   .game-stage,
@@ -309,6 +423,7 @@
     z-index: 4;
     display: flex;
     flex-direction: column;
+    align-items: center;
     padding:
       calc(8px + env(safe-area-inset-top))
       calc(10px + env(safe-area-inset-right))
@@ -318,6 +433,7 @@
 
   .top-controls {
     display: flex;
+    width: min(640px, 100%);
     justify-content: space-between;
     align-items: center;
     gap: 10px;
@@ -424,6 +540,13 @@
     flex-wrap: wrap;
   }
 
+  .menu-nav-links {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .primary,
   .ghost {
     pointer-events: auto;
@@ -451,6 +574,11 @@
     border-color: rgba(255, 120, 110, 0.2);
   }
 
+  .ghost.slim {
+    padding: 9px 12px;
+    font-size: 0.86rem;
+  }
+
   .locale-picker {
     display: grid;
     gap: 8px;
@@ -475,121 +603,155 @@
     position: absolute;
     left: 50%;
     z-index: 6;
-    transform: translateX(-50%);
-    max-width: min(300px, calc(100% - 26px));
-    padding: 10px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(8, 18, 28, 0.86);
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: min(340px, calc(100% - 28px));
+    padding: 11px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(196, 230, 255, 0.26);
+    background:
+      radial-gradient(circle at 24% 16%, rgba(142, 215, 255, 0.17), transparent 58%),
+      linear-gradient(145deg, rgba(7, 17, 30, 0.64), rgba(10, 20, 34, 0.56));
     color: #f8fbff;
-    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(12px) saturate(126%);
     text-align: center;
-    font-size: 0.9rem;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     animation: toast-in 180ms ease;
   }
 
-  .toast.bottom {
-    bottom: calc(18px + env(safe-area-inset-bottom));
-  }
-
-  .toast.center {
-    bottom: auto;
-    top: 45%;
-    transform: translate(-50%, -50%);
-    font-size: 0.98rem;
-    padding: 11px 16px;
-    border-color: rgba(255, 203, 136, 0.34);
-    box-shadow: 0 24px 54px rgba(0, 0, 0, 0.36);
-  }
-
-  .start-hint {
-    position: absolute;
-    left: 50%;
-    top: calc(58px + env(safe-area-inset-top));
-    z-index: 5;
-    transform: translateX(-50%);
-    max-width: min(320px, calc(100% - 24px));
-    padding: 9px 12px;
-    border-radius: 999px;
-    background: rgba(5, 16, 28, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #edf6fb;
-    font-size: 0.84rem;
-    text-align: center;
-    backdrop-filter: blur(16px);
-    animation: toast-in 180ms ease;
-  }
-
   .toast.accent {
-    background: rgba(255, 171, 88, 0.88);
-    color: #1f1100;
+    border-color: rgba(255, 199, 133, 0.34);
+    background:
+      radial-gradient(circle at 24% 14%, rgba(255, 224, 168, 0.2), transparent 60%),
+      linear-gradient(145deg, rgba(43, 23, 6, 0.64), rgba(34, 18, 5, 0.58));
+    color: #ffe0b0;
   }
 
   .toast.success {
-    background: rgba(110, 255, 207, 0.9);
-    color: #062018;
+    border-color: rgba(148, 255, 221, 0.3);
+    background:
+      radial-gradient(circle at 26% 14%, rgba(173, 255, 228, 0.22), transparent 60%),
+      linear-gradient(145deg, rgba(5, 36, 28, 0.62), rgba(6, 28, 22, 0.56));
+    color: #caffee;
   }
 
   .molecule-win {
     position: absolute;
     left: 50%;
-    top: calc(56px + env(safe-area-inset-top));
+    top: 50%;
     z-index: 6;
-    transform: translateX(-50%);
-    width: min(320px, calc(100% - 20px));
-    display: grid;
-    grid-template-columns: 88px 1fr;
-    gap: 10px;
+    transform: translate(-50%, -50%);
+    width: auto;
+    max-width: calc(100% - 20px);
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    padding: 10px;
+    gap: 3px;
+    padding: 0;
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    text-align: center;
+    pointer-events: none;
+    animation: molecule-win-in 180ms ease;
+  }
+
+  .chem-guide {
+    position: absolute;
+    left: 50%;
+    top: 28%;
+    z-index: 6;
+    transform: translate(-50%, -50%);
+    width: min(420px, calc(100% - 24px));
+    padding: 12px 14px;
     border-radius: 16px;
-    border: 1px solid rgba(145, 228, 255, 0.35);
+    border: 1px solid rgba(159, 228, 255, 0.24);
     background:
-      radial-gradient(circle at 18% 22%, rgba(94, 210, 255, 0.2), transparent 52%),
-      linear-gradient(140deg, rgba(8, 24, 36, 0.9), rgba(8, 18, 28, 0.92));
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
-    backdrop-filter: blur(12px);
-    animation: toast-in 190ms ease;
+      radial-gradient(circle at 18% 12%, rgba(111, 220, 255, 0.14), transparent 60%),
+      linear-gradient(150deg, rgba(4, 16, 31, 0.64), rgba(7, 20, 35, 0.52));
+    backdrop-filter: blur(8px);
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.26);
+    pointer-events: none;
+    animation: molecule-win-in 180ms ease;
   }
 
-  .molecule-preview {
-    height: 78px;
-    border-radius: 12px;
-    border: 1px solid rgba(145, 228, 255, 0.2);
-    background: rgba(8, 18, 30, 0.68);
-    overflow: hidden;
-  }
-
-  .molecule-copy {
-    display: grid;
-    gap: 2px;
-  }
-
-  .molecule-kicker {
-    font-size: 0.66rem;
+  .chem-guide-title {
+    display: block;
+    text-align: center;
+    color: #ebf8ff;
+    font-size: 0.9rem;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: rgba(186, 228, 248, 0.78);
   }
 
-  .molecule-copy strong {
-    font-size: 1.18rem;
-    line-height: 1.1;
-    color: #e9fbff;
+  .chem-guide-subtitle {
+    margin: 4px 0 8px;
+    text-align: center;
+    color: rgba(203, 232, 248, 0.86);
+    font-size: 0.78rem;
   }
 
-  .molecule-copy p {
+  .chem-guide-list {
+    display: grid;
+    gap: 5px;
+  }
+
+  .chem-guide-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(165, 219, 255, 0.16);
+    background: rgba(10, 26, 39, 0.38);
+  }
+
+  .chem-guide-row strong {
+    color: #f6fbff;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+  }
+
+  .chem-guide-row span {
+    color: rgba(202, 234, 250, 0.92);
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+  }
+
+  .molecule-formula {
+    font-size: 2rem;
+    line-height: 1;
+    color: #eaf6ff;
+    text-shadow:
+      0 12px 30px rgba(4, 16, 26, 0.66),
+      0 0 20px rgba(142, 221, 255, 0.42);
+  }
+
+  .molecule-name {
     margin: 0;
-    color: rgba(255, 210, 130, 0.96);
-    font-weight: 700;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(220, 241, 255, 0.9);
+    text-shadow: 0 6px 18px rgba(5, 14, 20, 0.62);
   }
 
-  .molecule-copy small {
-    color: rgba(201, 229, 244, 0.84);
-    font-size: 0.77rem;
+  .molecule-points {
+    margin: 0;
+    font-size: 1.2rem;
+    color: rgba(255, 210, 130, 0.96);
+    font-weight: 800;
+    text-shadow:
+      0 8px 24px rgba(29, 16, 4, 0.64),
+      0 0 12px rgba(255, 188, 102, 0.44);
   }
 
   .float-layer :global(.float-pop) {
@@ -647,6 +809,17 @@
     }
   }
 
+  @keyframes molecule-win-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -47%) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
   @media (max-width: 760px) {
     .run-pod {
       gap: 8px;
@@ -664,6 +837,7 @@
 
     .top-controls {
       gap: 8px;
+      width: 100%;
     }
 
     .mini-btn {

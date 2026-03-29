@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 # Local workspace artifacts
 build/
 physics-stack-ui/dev.err
+background/

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FRUITS, MOLECULE_RECIPES } from '../game/config-atoms.js';
+  import { ELEMENTS, MOLECULE_RECIPES } from '../game/config-atoms.js';
   import {
     loadDiscoveredAtomicNumbers,
     loadDiscoveredMoleculeIds,
@@ -7,24 +7,28 @@
   import { mountAtomAlbumPreview } from '../game/atom-album-preview.js';
   import { atomFact, atomName, locale, t } from '../app-i18n';
 
-  export let onBack: () => void = () => {};
-  export let onPlayAtoms: () => void = () => {};
-  let albumTab: 'elements' | 'molecules' = 'elements';
+  type Props = {
+    onBack?: () => void;
+    onPlayAtoms?: () => void;
+  };
 
-  $: currentLocale = $locale;
-  $: discoveredAtomicNumbers = loadDiscoveredAtomicNumbers();
-  $: discoveredMoleculeIds = loadDiscoveredMoleculeIds();
-  $: discoveredElements = discoveredAtomicNumbers.size;
-  $: discoveredMolecules = discoveredMoleculeIds.size;
-  $:
-    progress =
-      albumTab === 'elements'
-        ? Math.round((discoveredElements / FRUITS.length) * 100)
-        : Math.round((discoveredMolecules / MOLECULE_RECIPES.length) * 100);
-  $: unlockedCount = albumTab === 'elements' ? discoveredElements : discoveredMolecules;
-  $: totalCount = albumTab === 'elements' ? FRUITS.length : MOLECULE_RECIPES.length;
+  let { onBack = () => {}, onPlayAtoms = () => {} }: Props = $props();
+  let albumTab = $state<'elements' | 'molecules'>('elements');
 
-  const symbolByAtomic = new Map(FRUITS.map((e) => [e.atomicNumber, e.symbol]));
+  const currentLocale = $derived($locale);
+  const discoveredAtomicNumbers = $derived(loadDiscoveredAtomicNumbers());
+  const discoveredMoleculeIds = $derived(loadDiscoveredMoleculeIds());
+  const discoveredElements = $derived(discoveredAtomicNumbers.size);
+  const discoveredMolecules = $derived(discoveredMoleculeIds.size);
+  const progress = $derived(
+    albumTab === 'elements'
+      ? Math.round((discoveredElements / ELEMENTS.length) * 100)
+      : Math.round((discoveredMolecules / MOLECULE_RECIPES.length) * 100),
+  );
+  const unlockedCount = $derived(albumTab === 'elements' ? discoveredElements : discoveredMolecules);
+  const totalCount = $derived(albumTab === 'elements' ? ELEMENTS.length : MOLECULE_RECIPES.length);
+
+  const symbolByAtomic = new Map(ELEMENTS.map((e) => [e.atomicNumber, e.symbol]));
   function moleculeNeeds(recipe: { inputs: number[] }) {
     const counts = new Map<number, number>();
     for (const z of recipe.inputs) counts.set(z, (counts.get(z) ?? 0) + 1);
@@ -117,13 +121,13 @@
 
 <section class="album-shell">
   <div class="album-head">
-    <button class="nav-btn" on:click={onBack}>{t('common.back', undefined, currentLocale)}</button>
+    <button class="nav-btn" onclick={onBack}>{t('common.back', undefined, currentLocale)}</button>
     <div>
       <p class="eyebrow">{t('album.eyebrow', undefined, currentLocale)}</p>
       <h1>{t('album.title', undefined, currentLocale)}</h1>
       <p class="sub">{t('album.subtitle', undefined, currentLocale)}</p>
     </div>
-    <button class="play-btn" on:click={onPlayAtoms}>{t('album.play', undefined, currentLocale)}</button>
+    <button class="play-btn" onclick={onPlayAtoms}>{t('album.play', undefined, currentLocale)}</button>
   </div>
 
   <div class="progress-card">
@@ -140,13 +144,13 @@
   <div class="album-tabs">
     <button
       class={`tab-btn ${albumTab === 'elements' ? 'active' : ''}`}
-      on:click={() => (albumTab = 'elements')}
+      onclick={() => (albumTab = 'elements')}
     >
       {t('common.elements', undefined, currentLocale)}
     </button>
     <button
       class={`tab-btn ${albumTab === 'molecules' ? 'active' : ''}`}
-      on:click={() => (albumTab = 'molecules')}
+      onclick={() => (albumTab = 'molecules')}
     >
       {t('common.molecules', undefined, currentLocale)}
     </button>
@@ -154,7 +158,7 @@
 
   {#if albumTab === 'elements'}
     <div class="album-grid">
-      {#each FRUITS as element, index (element.atomicNumber)}
+      {#each ELEMENTS as element, index (element.atomicNumber)}
         <article class={`element-card ${isElementUnlocked(element.atomicNumber) ? 'open' : 'locked'}`}>
           <div class="element-top">
             <span>#{element.atomicNumber}</span>

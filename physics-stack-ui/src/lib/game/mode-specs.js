@@ -91,6 +91,83 @@ function makeRadialTexture(spec, drawExtra) {
   return tex;
 }
 
+function createElectronOrbitBand({
+  atomRadius,
+  orbitRadius,
+  thickness,
+  colorValue,
+  opacity,
+  seed = 0,
+  ghost = false,
+}) {
+  const group = new THREE.Group();
+  const ringThickness = Math.max(atomRadius * 0.0024, thickness * 0.22);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(orbitRadius, ringThickness, 8, 56),
+    new THREE.MeshBasicMaterial({
+      color: colorValue,
+      transparent: true,
+      opacity: opacity * (ghost ? 0.08 : 0.12),
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  group.add(ring);
+
+  const dotCount = Math.max(8, Math.min(16, Math.round(8 + orbitRadius / Math.max(atomRadius * 0.32, 0.01) * 1.6)));
+  const dotRadius = Math.max(atomRadius * 0.038, thickness * 0.9, 0.008);
+  const glowRadius = dotRadius * 2.2;
+  const dotColor = new THREE.Color(colorValue).offsetHSL(0, 0.05, 0.12);
+  const arcWindows = [
+    [0.04 + seed * 0.011, 0.2 + seed * 0.011],
+    [0.34 + seed * 0.009, 0.52 + seed * 0.009],
+    [0.7 + seed * 0.007, 0.88 + seed * 0.007],
+  ];
+
+  for (let step = 0; step < dotCount; step += 1) {
+    const u = step / dotCount;
+    const wrapped = ((u % 1) + 1) % 1;
+    const inArc = arcWindows.some(([start, end]) => {
+      const s = ((start % 1) + 1) % 1;
+      const e = ((end % 1) + 1) % 1;
+      return s <= e ? wrapped >= s && wrapped <= e : wrapped >= s || wrapped <= e;
+    });
+    if (!inArc) continue;
+
+    const angle = wrapped * Math.PI * 2;
+    const zWobble = Math.sin(angle * 2.4 + seed * 3.1) * thickness * 3.2;
+    const x = Math.cos(angle) * orbitRadius;
+    const y = Math.sin(angle) * orbitRadius * 0.98;
+
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(glowRadius, 8, 6),
+      new THREE.MeshBasicMaterial({
+        color: dotColor,
+        transparent: true,
+        opacity: opacity * (ghost ? 0.08 : 0.12),
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    glow.position.set(x, y, zWobble);
+    group.add(glow);
+
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(dotRadius, 8, 6),
+      new THREE.MeshBasicMaterial({
+        color: dotColor,
+        transparent: true,
+        opacity: opacity * (ghost ? 0.42 : 0.72),
+        depthWrite: false,
+      }),
+    );
+    dot.position.set(x, y, zWobble);
+    group.add(dot);
+  }
+
+  return group;
+}
+
 function createFruitVisual(type, radius, { ghost = false } = {}) {
   const spec = fruitConfig.FRUITS[type];
   const material = new THREE.MeshPhysicalMaterial({
@@ -162,14 +239,35 @@ function createNumberVisual(type, radius, { ghost = false } = {}) {
 }
 
 function createAtomVisual(type, radius, { ghost = false } = {}) {
-  const spec = atomsConfig.FRUITS[type];
+  const spec = atomsConfig.getActiveAtomSpec(type) ?? atomsConfig.FRUITS[type];
   const skin = getEquippedAtomSkinDef();
   const skinId = skin?.id ?? 'default';
+  const visual = atomsConfig.getAtomVisualProfile?.(spec) ?? atomsConfig.ATOM_VISUAL_DEFAULTS;
   const roughnessMap = makeNoiseMap();
-  const faceMap = makeRadialTexture(spec, (ctx, size, data) => drawElementFace2d(ctx, size, data));
+  const faceSpec =
+    skinId === 'bohr_classic'
+      ? {
+          ...spec,
+          visual: { ...(spec?.visual ?? {}), bohrFace: true },
+        }
+      : spec;
+  const faceMap = makeRadialTexture(faceSpec, (ctx, size, data) => drawElementFace2d(ctx, size, data));
   const style = getAtomBallStyle(type, spec, skinId);
+  const spinNodes = [];
+  const decorativeSkin = skinId !== 'default';
+  const explicitLayers = Array.isArray(spec?.layers) ? spec.layers.filter((layer) => layer?.enabled !== false) : [];
+  const coreRadius = radius * (visual.coreScale ?? 0.84);
+  const nucleusScale = visual.nucleusScale ?? 0.12;
+  const nucleusOpacity = visual.nucleusOpacity ?? 0.8;
+  const cloudOpacity = visual.cloudOpacity ?? 0.11;
+  const cloudSpin = visual.cloudSpin ?? 0.12;
+  const shellRadius = visual.shellRadius ?? 1.08;
+  const shellThickness = visual.shellThickness ?? 0.018;
+  const shellOpacity = visual.shellOpacity ?? 0.08;
+  const shellSpin = visual.shellSpin ?? 0.16;
+  const coreColor = Number.isFinite(visual.coreColor) ? Number(visual.coreColor) : style.color;
   const material = new THREE.MeshPhysicalMaterial({
-    color: style.color,
+    color: coreColor,
     map: faceMap,
     roughnessMap,
     roughness: ghost ? Math.min(0.18, style.roughness) : style.roughness,
@@ -179,7 +277,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     clearcoat: style.clearcoat,
     clearcoatRoughness: style.clearcoatRoughness,
     ior: style.ior,
-    attenuationColor: style.color,
+    attenuationColor: coreColor,
     attenuationDistance: 0.46 + type * 0.06,
     emissive: style.emissive,
     emissiveIntensity: ghost ? (style.emissiveIntensity ?? 0.05) + 0.08 : Math.max(0.04, style.emissiveIntensity ?? 0.03),
@@ -187,9 +285,302 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     transparent: ghost,
     opacity: ghost ? 0.74 : 1,
   });
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 24), material);
   const root = new THREE.Group();
-  if (spec.phase === 'liquid') {
+  let ball = null;
+  let rotationTarget = null;
+  let glowTarget = null;
+
+  function buildLayeredAtom() {
+    if (explicitLayers.length <= 0) return false;
+    const defaultCoreColor = Number.isFinite(visual.coreColor) ? Number(visual.coreColor) : style.color;
+    const defaultNucleusColor = Number.isFinite(visual.nucleusColor) ? Number(visual.nucleusColor) : style.color;
+    const defaultCloudColor = Number.isFinite(visual.electronColor) ? Number(visual.electronColor) : style.color;
+    const defaultShellColor = Number.isFinite(visual.shellColor) ? Number(visual.shellColor) : defaultCloudColor;
+    const defaultHaloColor = Number.isFinite(visual.haloColor) ? Number(visual.haloColor) : defaultCloudColor;
+
+    let primaryCoreAssigned = false;
+    for (let index = 0; index < explicitLayers.length; index += 1) {
+      const layer = explicitLayers[index];
+      const typeName = String(layer?.type ?? '').toLowerCase();
+      const sizePct = Math.max(0, Number(layer?.sizePct ?? 100) || 0);
+      const layerRadius = radius * (sizePct / 100);
+      const opacityBase = Math.max(0, Math.min(1, (Number(layer?.opacityPct ?? 100) || 0) / 100));
+      const glowBase = Math.max(0, Math.min(1, (Number(layer?.glowPct ?? 0) || 0) / 100));
+      const spinBase = Math.max(0, Number(layer?.spinPct ?? 0) || 0) / 100;
+      const copies = Math.max(1, Math.round(Number(layer?.count ?? 1) || 1));
+      const colorValue =
+        Number.isFinite(layer?.color)
+          ? Number(layer.color)
+          : typeName === 'nucleus'
+            ? defaultNucleusColor
+            : typeName === 'cloud'
+              ? defaultCloudColor
+              : typeName === 'shell'
+                ? defaultShellColor
+                : typeName === 'halo'
+                  ? defaultHaloColor
+                  : defaultCoreColor;
+
+      if (layerRadius <= 0.0005 && typeName !== 'shell') continue;
+
+      if (typeName === 'shell') {
+        const shellOpacityPct = ghost ? opacityBase * 0.6 : opacityBase;
+        const shellOpacity = shellOpacityPct * 0.52;
+        const shellThicknessPct = Math.max(0, Number(layer?.thicknessPct ?? 45) || 0) / 100;
+        const shellThickness = Math.max(radius * 0.0035, radius * 0.08 * shellThicknessPct);
+        const orbitRadiusMul = Math.max(0, Number(layer?.orbitRadiusPct ?? 100) || 0) / 100;
+        const spreadMul = Math.max(0, Number(layer?.spreadPct ?? 36) || 0) / 100;
+        const tiltMul = Math.max(0, Number(layer?.tiltPct ?? 58) || 0) / 100;
+        for (let i = 0; i < copies; i += 1) {
+          const orbitRadius = Math.max(
+            radius * 0.08,
+            layerRadius * Math.max(0.2, orbitRadiusMul) + radius * i * (0.03 + spreadMul * 0.09),
+          );
+          const shell = createElectronOrbitBand({
+            atomRadius: radius,
+            orbitRadius,
+            thickness: shellThickness,
+            colorValue,
+            opacity: shellOpacity,
+            seed: i + index * 0.7,
+            ghost,
+          });
+          const tilt = 0.18 + tiltMul * 1.04;
+          shell.rotation.x = tilt + i * (0.32 + tiltMul * 0.3) + index * 0.06;
+          shell.rotation.y = 0.12 + i * (0.22 + tiltMul * 0.2) + index * 0.05;
+          root.add(shell);
+          spinNodes.push({
+            node: shell,
+            x: 0,
+            y: spinBase * (1.25 + spreadMul * 0.8) * (i % 2 === 0 ? 1 : -1),
+            z: spinBase * (0.4 + tiltMul * 0.45) * (i % 2 === 0 ? 1 : -1),
+          });
+        }
+        continue;
+      }
+
+      const isPrimaryCore = typeName === 'core' && !primaryCoreAssigned;
+      const useFaceMap = isPrimaryCore;
+      const isAdditive = typeName === 'cloud' || typeName === 'halo';
+      const opacity =
+        ghost
+          ? opacityBase * (isAdditive ? 0.6 : 0.74)
+          : isAdditive
+            ? opacityBase * 0.34
+            : opacityBase;
+      const sphereMaterial =
+        typeName === 'core'
+          ? new THREE.MeshPhysicalMaterial({
+              color: colorValue,
+              ...(useFaceMap ? { map: faceMap, roughnessMap } : {}),
+              roughness: ghost ? Math.min(0.18, style.roughness) : style.roughness,
+              metalness: ghost ? style.metalness * 0.6 : style.metalness,
+              transmission: ghost ? Math.min(0.82, style.transmission + 0.14) : style.transmission,
+              thickness: style.thickness,
+              clearcoat: style.clearcoat,
+              clearcoatRoughness: style.clearcoatRoughness,
+              ior: style.ior,
+              attenuationColor: colorValue,
+              attenuationDistance: 0.46 + type * 0.06,
+              emissive: style.emissive,
+              emissiveIntensity: ghost
+                ? (style.emissiveIntensity ?? 0.05) + 0.08
+                : Math.max(0.04, style.emissiveIntensity ?? 0.03),
+              envMapIntensity: style.envMapIntensity,
+              transparent: ghost || opacity < 0.999,
+              opacity,
+              depthWrite: opacity >= 0.999,
+            })
+          : new THREE.MeshBasicMaterial({
+              color: colorValue,
+              ...(typeName === 'cloud' ? { alphaMap: roughnessMap } : {}),
+              transparent: true,
+              opacity,
+              depthWrite: false,
+              blending: isAdditive ? THREE.AdditiveBlending : THREE.NormalBlending,
+            });
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(layerRadius, typeName === 'nucleus' ? 18 : 28, typeName === 'nucleus' ? 14 : 22),
+        sphereMaterial,
+      );
+      root.add(sphere);
+      if (typeName === 'core') {
+        sphere.castShadow = !ghost;
+        sphere.receiveShadow = true;
+      }
+      if (isPrimaryCore) {
+        ball = sphere;
+        rotationTarget = sphere;
+        glowTarget = sphere;
+        primaryCoreAssigned = true;
+      }
+      if (spinBase > 0.001) {
+        spinNodes.push({
+          node: sphere,
+          x: typeName === 'cloud' ? spinBase * 0.08 : 0,
+          y: spinBase * (typeName === 'halo' ? 0.8 : 1.12),
+          z: spinBase * (typeName === 'cloud' ? 0.14 : 0.06),
+        });
+      }
+      if (glowBase > 0.001) {
+        const glowScale =
+          typeName === 'halo' ? 1.1 + glowBase * 0.24 : typeName === 'cloud' ? 1.04 + glowBase * 0.18 : 1.02 + glowBase * 0.1;
+        const glowOpacity = (ghost ? glowBase * 0.3 : glowBase * 0.22) * (typeName === 'halo' ? 1.5 : 1);
+        const glow = new THREE.Mesh(
+          new THREE.SphereGeometry(layerRadius * glowScale, 18, 14),
+          new THREE.MeshBasicMaterial({
+            color: colorValue,
+            transparent: true,
+            opacity: glowOpacity,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        );
+        root.add(glow);
+      }
+    }
+
+    if (!ball) {
+      ball = new THREE.Mesh(new THREE.SphereGeometry(coreRadius, 32, 24), material);
+      ball.castShadow = !ghost;
+      ball.receiveShadow = true;
+      root.add(ball);
+      rotationTarget = ball;
+      glowTarget = ball;
+    }
+    return true;
+  }
+
+  const colorBase = new THREE.Color(coreColor);
+  const protonColor = new THREE.Color(
+    Number.isFinite(visual.protonColor) ? visual.protonColor : colorBase.clone().offsetHSL(0.01, 0.14, 0.06),
+  );
+  const neutronColor = new THREE.Color(
+    Number.isFinite(visual.neutronColor) ? visual.neutronColor : colorBase.clone().offsetHSL(-0.03, -0.04, -0.18),
+  );
+  const nucleusColor = new THREE.Color(
+    Number.isFinite(visual.nucleusColor)
+      ? visual.nucleusColor
+      : protonColor.clone().lerp(neutronColor, 0.48),
+  );
+  const cloudColor = new THREE.Color(
+    Number.isFinite(visual.electronColor) ? visual.electronColor : colorBase.clone().offsetHSL(0, 0.02, 0.2),
+  );
+  const cloudScale = Math.max(visual.cloudScale ?? 1, 0.01);
+  const shellColor = new THREE.Color(Number.isFinite(visual.shellColor) ? visual.shellColor : cloudColor);
+  const haloColor = new THREE.Color(Number.isFinite(visual.haloColor) ? visual.haloColor : cloudColor);
+  const usedLayeredAtom = buildLayeredAtom();
+
+  const nucleus = new THREE.Mesh(
+    new THREE.SphereGeometry(coreRadius * nucleusScale, 14, 12),
+    new THREE.MeshBasicMaterial({
+      color: nucleusColor,
+      transparent: true,
+      opacity: ghost ? Math.min(0.5, nucleusOpacity * 0.7) : nucleusOpacity,
+      depthWrite: false,
+    }),
+  );
+  if (!usedLayeredAtom) root.add(nucleus);
+
+  if (nucleusScale > 0.01) {
+    const nucleonRadius = Math.max(coreRadius * nucleusScale * 0.28, radius * 0.024);
+    const protonDot = new THREE.Mesh(
+      new THREE.SphereGeometry(nucleonRadius, 8, 6),
+      new THREE.MeshBasicMaterial({
+        color: protonColor,
+        transparent: true,
+        opacity: ghost ? 0.32 : 0.62,
+        depthWrite: false,
+      }),
+    );
+    protonDot.position.set(-nucleonRadius * 0.78, nucleonRadius * 0.42, nucleonRadius * 0.18);
+    if (!usedLayeredAtom) root.add(protonDot);
+    const neutronDot = new THREE.Mesh(
+      new THREE.SphereGeometry(nucleonRadius, 8, 6),
+      new THREE.MeshBasicMaterial({
+        color: neutronColor,
+        transparent: true,
+        opacity: ghost ? 0.32 : 0.62,
+        depthWrite: false,
+      }),
+    );
+    neutronDot.position.set(nucleonRadius * 0.68, -nucleonRadius * 0.32, -nucleonRadius * 0.16);
+    if (!usedLayeredAtom) root.add(neutronDot);
+  }
+
+  const electronCloud = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * cloudScale, 20, 16),
+    new THREE.MeshBasicMaterial({
+      color: cloudColor,
+      alphaMap: roughnessMap,
+      transparent: true,
+      opacity: ghost ? cloudOpacity * 0.6 : cloudOpacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  if (!usedLayeredAtom) {
+    root.add(electronCloud);
+    spinNodes.push({
+      node: electronCloud,
+      x: cloudSpin * 0.07,
+      y: cloudSpin,
+      z: cloudSpin * 0.12,
+    });
+  }
+
+  for (let i = 0; !usedLayeredAtom && i < visual.shellCount; i += 1) {
+    const rMul = shellRadius + i * 0.085;
+    const shell = createElectronOrbitBand({
+      atomRadius: radius,
+      orbitRadius: radius * rMul,
+      thickness: radius * shellThickness,
+      colorValue: shellColor,
+      opacity: ghost ? shellOpacity * 0.7 : shellOpacity,
+      seed: i + type * 0.17,
+      ghost,
+    });
+    shell.rotation.x = 0.6 + i * 0.48;
+    shell.rotation.y = 0.3 + i * 0.37;
+    root.add(shell);
+    const d = i % 2 === 0 ? 1 : -1;
+    spinNodes.push({
+      node: shell,
+      x: 0,
+      y: shellSpin * d * (0.84 + i * 0.2),
+      z: shellSpin * 0.25 * d,
+    });
+  }
+
+  if (!usedLayeredAtom && visual.cloudGlow > 0.001) {
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * (cloudScale + 0.06), 18, 14),
+      new THREE.MeshBasicMaterial({
+        color: cloudColor,
+        transparent: true,
+        opacity: ghost ? visual.cloudGlow * 0.45 : visual.cloudGlow,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    root.add(glow);
+  }
+
+  if (!usedLayeredAtom && visual.nucleusEmissive > 0.001) {
+    const coreGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * (nucleusScale * 1.55), 12, 10),
+      new THREE.MeshBasicMaterial({
+        color: nucleusColor.clone().offsetHSL(0, 0.04, 0.24),
+        transparent: true,
+        opacity: ghost ? visual.nucleusEmissive * 0.42 : visual.nucleusEmissive,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    root.add(coreGlow);
+  }
+
+  if (decorativeSkin && spec.phase === 'liquid') {
     const flowBand = new THREE.Mesh(
       new THREE.TorusGeometry(radius * 0.84, radius * 0.055, 10, 54),
       new THREE.MeshBasicMaterial({
@@ -205,7 +596,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     root.add(flowBand);
   }
 
-  if (spec.phase === 'gas' || skinId === 'neon_glow' || skinId === 'bio_luminescent') {
+  if (decorativeSkin && (spec.phase === 'gas' || skinId === 'neon_glow' || skinId === 'bio_luminescent')) {
     const halo = new THREE.Mesh(
       new THREE.SphereGeometry(
         radius *
@@ -225,7 +616,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
             ? 0x6f8cff
             : skinId === 'bio_luminescent'
               ? 0x69ffc7
-              : spec.color,
+              : haloColor,
         transparent: true,
         opacity:
           ghost
@@ -258,7 +649,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     root.add(sheen);
   }
 
-  if (spec.family === 'halogen') {
+  if (decorativeSkin && spec.family === 'halogen') {
     const rim = new THREE.Mesh(
       new THREE.TorusGeometry(radius * 1.06, radius * 0.018, 8, 60),
       new THREE.MeshBasicMaterial({
@@ -333,13 +724,19 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     }
   }
 
-  root.add(ball);
-  ball.castShadow = !ghost;
-  ball.receiveShadow = true;
+  if (!usedLayeredAtom) {
+    ball = new THREE.Mesh(new THREE.SphereGeometry(coreRadius, 32, 24), material);
+    root.add(ball);
+    ball.castShadow = !ghost;
+    ball.receiveShadow = true;
+    rotationTarget = ball;
+    glowTarget = ball;
+  }
   return {
     root,
-    rotationTarget: ball,
-    glowTarget: ball,
+    rotationTarget: rotationTarget ?? ball,
+    glowTarget: glowTarget ?? ball,
+    spinNodes,
     dispose: () => {
       roughnessMap.dispose();
       faceMap.dispose();
@@ -423,7 +820,7 @@ const SPECS = {
       return t('mode.atoms.tier.discovery');
     },
     queueLabel(type) {
-      return atomsConfig.FRUITS[type]?.symbol ?? `Z${type + 1}`;
+      return atomsConfig.getActiveAtomSpec(type)?.symbol ?? `Z${type + 1}`;
     },
     jackpotText(points) {
       return t('mode.atoms.jackpot', { points });

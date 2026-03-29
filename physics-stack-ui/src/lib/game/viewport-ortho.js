@@ -16,7 +16,7 @@ export function createOrthoViewportLayout({ renderer, camera, canvasEl }) {
     orthoBaseHalfSpanY: 6,
     orthoMidY: 5,
     /** Vertical FOV (deg) for PerspectiveCamera — tuned from cup half-height */
-    perspectiveFov: 42,
+    perspectiveFov: 60,
   };
 
   function hudReservePx() {

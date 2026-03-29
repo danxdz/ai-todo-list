@@ -5,10 +5,56 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
+const PLAYFIELD_BG_IMAGE_CACHE = new Map();
+
+function loadPlayfieldBackdropImage(url) {
+  if (!url) return Promise.resolve(null);
+  if (PLAYFIELD_BG_IMAGE_CACHE.has(url)) return Promise.resolve(PLAYFIELD_BG_IMAGE_CACHE.get(url));
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      PLAYFIELD_BG_IMAGE_CACHE.set(url, img);
+      resolve(img);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function drawBackdropCover(ctx, img, width, height, alpha = 0.22, zoom = 1) {
+  if (!img) return;
+  const scale = Math.min(width / img.width, height / img.height) * zoom;
+  const drawW = img.width * scale;
+  const drawH = img.height * scale;
+  const x = (width - drawW) * 0.5;
+  const y = (height - drawH) * 0.5;
+  ctx.save();
+  ctx.fillStyle = '#050a11';
+  ctx.fillRect(0, 0, width, height);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(img, x, y, drawW, drawH);
+  const vignette = ctx.createRadialGradient(
+    width * 0.5,
+    height * 0.5,
+    Math.min(width, height) * 0.32,
+    width * 0.5,
+    height * 0.5,
+    Math.max(width, height) * 0.75,
+  );
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(0.64, 'rgba(0, 0, 0, 0.22)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.62)');
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
 /** @typedef {'marble' | 'numbers' | 'atoms'} PlayfieldThemeId */
 
 /**
- * Slight low tilt + (for perspective) mild side offset so the cup reads clearly in 3D.
+ * Straight horizontal alignment (no side yaw) with enough downward tilt for stable aiming.
  * @param {import('three').Camera} camera
  * @param {number} midY — matches layout orthoMidY from fitCameraToCup
  */
@@ -16,8 +62,7 @@ export function applyMergeOrthoCameraPose(camera, midY) {
   const lookYFocus = midY + 0.86;
   if (camera.isPerspectiveCamera) {
     const dist = 17.1;
-    const lateral = 0.8;
-    camera.position.set(lateral, midY + 2.85, dist);
+    camera.position.set(0, midY + 2.85, dist);
   } else {
     camera.position.set(0, midY + 2.15, 19.8);
   }
@@ -75,6 +120,7 @@ export const PLAYFIELD_THEMES = {
  * @param {(v: number) => void} opts.setGameOverY
  * @param {number} opts.GAME_OVER_BELOW_RIM
  * @param {PlayfieldThemeId} [opts.themeId]
+ * @param {string} [opts.playfieldBackgroundUrl]
  */
 export function createPlayfieldCup(opts) {
   const {
@@ -95,11 +141,70 @@ export function createPlayfieldCup(opts) {
     setGameOverY,
     GAME_OVER_BELOW_RIM,
     themeId = 'marble',
+    playfieldBackgroundUrl = '',
   } = opts;
 
   const theme = PLAYFIELD_THEMES[themeId] ?? PLAYFIELD_THEMES.marble;
 
   let playfieldMaps = null;
+  let activeBackdropUrl = typeof playfieldBackgroundUrl === 'string' ? playfieldBackgroundUrl : '';
+
+  function repaintBackMap() {
+    if (!playfieldMaps?.backCtx || !playfieldMaps?.backCanvas || !playfieldMaps?.backMap) return;
+    const bx = playfieldMaps.backCtx;
+    const cb = playfieldMaps.backCanvas;
+    const bw = cb.width;
+    const bh = cb.height;
+
+    bx.clearRect(0, 0, bw, bh);
+    const gStops = theme.backGrad;
+    const vg = bx.createLinearGradient(0, 0, 0, bh);
+    const n = gStops.length - 1;
+    gStops.forEach((c, i) => vg.addColorStop(i / n, c));
+    bx.fillStyle = vg;
+    bx.fillRect(0, 0, bw, bh);
+
+    drawBackdropCover(bx, playfieldMaps.backdropImage, bw, bh, 0.22, 1.1);
+    bx.fillStyle = 'rgba(8, 18, 30, 0.42)';
+    bx.fillRect(0, 0, bw, bh);
+
+    const rg = bx.createRadialGradient(bw * 0.5, bh * 0.35, bh * 0.08, bw * 0.45, bh * 0.42, bh * 0.62);
+    rg.addColorStop(0, theme.backRadial);
+    rg.addColorStop(0.45, 'rgba(60, 90, 140, 0.08)');
+    rg.addColorStop(1, 'rgba(20, 28, 48, 0)');
+    bx.fillStyle = rg;
+    bx.fillRect(0, 0, bw, bh);
+
+    bx.globalAlpha = 0.14;
+    for (let i = 0; i < 900; i += 1) {
+      bx.fillStyle = `rgba(255,255,255,${0.03 + Math.random() * 0.06})`;
+      bx.fillRect(Math.random() * bw, Math.random() * bh, 1.2, 2.2 + Math.random() * 3);
+    }
+    bx.globalAlpha = 1;
+    playfieldMaps.backMap.needsUpdate = true;
+  }
+
+  function setBackdropImage(url = '') {
+    activeBackdropUrl = typeof url === 'string' ? url : '';
+    if (!playfieldMaps) return;
+    if (!activeBackdropUrl) {
+      playfieldMaps.backdropImage = null;
+      repaintBackMap();
+      return;
+    }
+    const token = activeBackdropUrl;
+    loadPlayfieldBackdropImage(activeBackdropUrl)
+      .then((img) => {
+        if (!playfieldMaps || activeBackdropUrl !== token) return;
+        playfieldMaps.backdropImage = img;
+        repaintBackMap();
+      })
+      .catch(() => {
+        if (!playfieldMaps || activeBackdropUrl !== token) return;
+        playfieldMaps.backdropImage = null;
+        repaintBackMap();
+      });
+  }
 
   function ensurePlayfieldMaps() {
     if (playfieldMaps) return playfieldMaps;
@@ -109,24 +214,6 @@ export function createPlayfieldCup(opts) {
     cb.width = bw;
     cb.height = bh;
     const bx = cb.getContext('2d');
-    const gStops = theme.backGrad;
-    const vg = bx.createLinearGradient(0, 0, 0, bh);
-    const n = gStops.length - 1;
-    gStops.forEach((c, i) => vg.addColorStop(i / n, c));
-    bx.fillStyle = vg;
-    bx.fillRect(0, 0, bw, bh);
-    const rg = bx.createRadialGradient(bw * 0.5, bh * 0.35, bh * 0.08, bw * 0.45, bh * 0.42, bh * 0.62);
-    rg.addColorStop(0, theme.backRadial);
-    rg.addColorStop(0.45, 'rgba(60, 90, 140, 0.08)');
-    rg.addColorStop(1, 'rgba(20, 28, 48, 0)');
-    bx.fillStyle = rg;
-    bx.fillRect(0, 0, bw, bh);
-    bx.globalAlpha = 0.14;
-    for (let i = 0; i < 900; i++) {
-      bx.fillStyle = `rgba(255,255,255,${0.03 + Math.random() * 0.06})`;
-      bx.fillRect(Math.random() * bw, Math.random() * bh, 1.2, 2.2 + Math.random() * 3);
-    }
-    bx.globalAlpha = 1;
     const backMap = new THREE.CanvasTexture(cb);
     backMap.colorSpace = THREE.SRGBColorSpace;
 
@@ -168,7 +255,9 @@ export function createPlayfieldCup(opts) {
     floorMap.repeat.set(2.2, 2.2);
     floorMap.colorSpace = THREE.SRGBColorSpace;
 
-    playfieldMaps = { backMap, floorMap };
+    playfieldMaps = { backMap, floorMap, backCanvas: cb, backCtx: bx, backdropImage: null };
+    repaintBackMap();
+    setBackdropImage(activeBackdropUrl);
     return playfieldMaps;
   }
 
@@ -348,11 +437,11 @@ export function createPlayfieldCup(opts) {
   }
 
   function computeCupHeightForViewport(viewportW, viewportH) {
-    const minH = 9.2;
-    const maxH = 16.5;
+    const minH = 8.8;
+    const maxH = 14.8;
     const t = Math.min(1, viewportH / 620);
     const portrait = viewportH / Math.max(1, viewportW);
-    const portraitTrim = portrait > 1.8 ? Math.min(1.15, (portrait - 1.8) * 1.1) : 0;
+    const portraitTrim = portrait > 1.6 ? Math.min(2.4, (portrait - 1.6) * 2.4) : 0;
     return minH + (maxH - minH) * t - portraitTrim;
   }
 
@@ -373,17 +462,18 @@ export function createPlayfieldCup(opts) {
     const backCenterY = wh * 0.5 - 0.08;
     const panelTop = backCenterY + backH / 2;
     const panelBot = backCenterY - backH / 2;
-    // Reserve more visual breathing room under the cup so bottom HUD never sits on live balls.
-    const padBelow = portrait ? 0.98 : 0.82;
+    // Keep stronger vertical safe zones on phone ratios so top queue and bottom pile are fully visible.
+    const padBelow = portrait ? 2.1 : 1.34;
+    const padAbove = portrait ? 0.36 : 0.24;
     const contentLow = Math.min(panelBot - 0.06, floorY - padBelow);
     const contentHigh =
-      Math.max(panelTop + 0.12, rimTop + 0.62, getDropCenterY() + 0.72) + 0.55;
+      Math.max(panelTop + 0.12, rimTop + 0.62, getDropCenterY() + 0.72 + padAbove) + 0.55;
 
     const vMargin = 0.22;
     const lowWorld = contentLow - vMargin;
     const highWorld = contentHigh + vMargin;
-    // Lift frame a bit so the pile sits higher above bottom HUD.
-    const frameLift = portrait ? 0.28 : 0.16;
+    // Small bias only; large lift can crop both queue/top and bottom pile on tall phones.
+    const frameLift = 0;
     const midY = (lowWorld + highWorld) / 2 + frameLift;
     const halfSpanY = (highWorld - lowWorld) / 2;
     applyCupOrthoFrame({ halfW, halfSpanY, midY });
@@ -395,8 +485,12 @@ export function createPlayfieldCup(opts) {
 
   function applyCupLayout() {
     const { width: vw, height: vh } = getViewportSize();
-    CUP.wallH = computeCupHeightForViewport(vw, vh);
-    setDropCenterY(CUP.wallH - 0.55);
+    const portrait = vh >= vw;
+    // Slightly lower the whole cup so we keep cleaner headroom at the top.
+    const cupTopLower = portrait ? 0.24 : 0.16;
+    CUP.wallH = computeCupHeightForViewport(vw, vh) - cupTopLower;
+    // Lower active drop lane too, so incoming ball starts a bit lower than before.
+    setDropCenterY(CUP.wallH + (portrait ? -0.08 : -0.8));
     setGameOverY(CUP.wallH - GAME_OVER_BELOW_RIM);
     buildCupVisuals();
     buildStaticPhysics();
@@ -414,6 +508,7 @@ export function createPlayfieldCup(opts) {
     computeCupHeightForViewport,
     fitCameraToCup,
     applyCupLayout,
+    setBackdropImage,
     get dangerLine() {
       return dangerLine;
     },

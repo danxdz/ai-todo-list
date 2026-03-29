@@ -12,12 +12,16 @@
   import { RELEASE_FLAGS } from '../release-flags.js';
   import { mountAtomSkinPreview } from '../game/atom-skin-preview.js';
 
-  export let onBack: () => void = () => {};
-  export let onPlay: () => void = () => {};
+  type Props = {
+    onBack?: () => void;
+    onPlay?: () => void;
+  };
 
-  let stats = getAtomSkinStats();
-  let equippedId = getEquippedAtomSkinId();
-  $: currentLocale = $locale;
+  let { onBack = () => {}, onPlay = () => {} }: Props = $props();
+
+  let stats = $state(getAtomSkinStats());
+  let equippedId = $state(getEquippedAtomSkinId());
+  const currentLocale = $derived($locale);
 
   function refresh() {
     stats = getAtomSkinStats();
@@ -36,18 +40,30 @@
 
   function requirementLabel(skin: (typeof ATOM_SKINS)[number], unlockState: any) {
     const unlock = skin.unlock ?? { type: 'free' };
-    if (unlock.type === 'free') return 'Free';
-    if (unlock.type === 'ad_optional') return 'Get help (ad)';
+    if (unlock.type === 'free') return t('shop.requirementFree', undefined, currentLocale);
+    if (unlock.type === 'ad_optional') return t('shop.requirementAd', undefined, currentLocale);
     if (unlock.type === 'discover_elements') {
-      return `Discover elements: ${unlockState.progress ?? `0/${unlock.value}`}`;
+      return t(
+        'shop.requirementDiscoverElements',
+        { progress: unlockState.progress ?? `0/${unlock.value}` },
+        currentLocale,
+      );
     }
     if (unlock.type === 'discover_molecules') {
-      return `Discover molecules: ${unlockState.progress ?? `0/${unlock.value}`}`;
+      return t(
+        'shop.requirementDiscoverMolecules',
+        { progress: unlockState.progress ?? `0/${unlock.value}` },
+        currentLocale,
+      );
     }
     if (unlock.type === 'play_minutes') {
-      return `Play time: ${unlockState.progress ?? `0/${unlock.value}m`}`;
+      return t(
+        'shop.requirementPlayTime',
+        { progress: unlockState.progress ?? `0/${unlock.value}m` },
+        currentLocale,
+      );
     }
-    return 'Locked';
+    return t('shop.requirementLocked', undefined, currentLocale);
   }
 
   function skinHex(accent: number) {
@@ -69,44 +85,46 @@
     };
   }
 
-  $: cards = getEnabledAtomSkins().map((skin) => {
-    const unlockState = getAtomSkinUnlockState(skin, stats);
-    return {
-      ...skin,
-      unlockState,
-      equipped: skin.id === equippedId,
-      unlocked: !!unlockState.unlocked,
-    };
-  });
-  $: basicCards = cards.filter((c) => c.tier === 'basic');
-  $: premiumCards = cards.filter((c) => c.tier === 'premium');
-  $: rareCards = cards.filter((c) => c.tier === 'rare');
+  const cards = $derived(
+    getEnabledAtomSkins().map((skin) => {
+      const unlockState = getAtomSkinUnlockState(skin, stats);
+      return {
+        ...skin,
+        unlockState,
+        equipped: skin.id === equippedId,
+        unlocked: !!unlockState.unlocked,
+      };
+    }),
+  );
+  const basicCards = $derived(cards.filter((c) => c.tier === 'basic'));
+  const premiumCards = $derived(cards.filter((c) => c.tier === 'premium'));
+  const rareCards = $derived(cards.filter((c) => c.tier === 'rare'));
 </script>
 
 <section class="shop-shell">
   <div class="shop-head">
-    <button class="back-btn" on:click={onBack}>{t('common.back', undefined, currentLocale)}</button>
+    <button class="back-btn" onclick={onBack}>{t('common.back', undefined, currentLocale)}</button>
     <div>
-      <p class="eyebrow">Skins Lab</p>
-      <h1>Atom Cosmetics</h1>
+      <p class="eyebrow">{t('shop.labEyebrow', undefined, currentLocale)}</p>
+      <h1>{t('shop.labTitle', undefined, currentLocale)}</h1>
       <p>
         {#if RELEASE_FLAGS.enableSkinsLab}
-          No paywall. Unlock by play, discovery, or optional ad help.
+          {t('shop.labNoPaywall', undefined, currentLocale)}
         {:else}
-          Curated set active for release stability.
+          {t('shop.labCurated', undefined, currentLocale)}
         {/if}
       </p>
     </div>
-    <button class="play-btn" on:click={onPlay}>{t('common.playNow', undefined, currentLocale)}</button>
+    <button class="play-btn" onclick={onPlay}>{t('common.playNow', undefined, currentLocale)}</button>
   </div>
 
   <div class="stats-row">
-    <span>Elements: {stats.discoveredElements}</span>
-    <span>Molecules: {stats.discoveredMolecules}</span>
-    <span>Play: {stats.playMinutes}m</span>
+    <span>{t('shop.statElements', { count: stats.discoveredElements }, currentLocale)}</span>
+    <span>{t('shop.statMolecules', { count: stats.discoveredMolecules }, currentLocale)}</span>
+    <span>{t('shop.statPlay', { count: stats.playMinutes }, currentLocale)}</span>
   </div>
 
-  <div class="section-title">Basic</div>
+  <div class="section-title">{t('shop.sectionBasic', undefined, currentLocale)}</div>
   <div class="shop-grid">
     {#each basicCards as card}
       <article class={`shop-card basic ${card.equipped ? 'equipped' : ''}`}>
@@ -117,11 +135,11 @@
         <div class="card-foot">
           <small>{requirementLabel(card, card.unlockState)}</small>
           {#if card.equipped}
-            <button class="equipped-btn" disabled>Equipped</button>
+            <button class="equipped-btn" disabled>{t('shop.actionEquipped', undefined, currentLocale)}</button>
           {:else if card.unlocked}
-            <button on:click={() => equip(card.id)}>Equip</button>
+            <button onclick={() => equip(card.id)}>{t('shop.actionEquip', undefined, currentLocale)}</button>
           {:else}
-            <button class="locked-btn" disabled>Locked</button>
+            <button class="locked-btn" disabled>{t('shop.actionLocked', undefined, currentLocale)}</button>
           {/if}
         </div>
       </article>
@@ -129,7 +147,7 @@
   </div>
 
   {#if RELEASE_FLAGS.enableSkinsLab}
-    <div class="section-title">Premium (Optional Help)</div>
+    <div class="section-title">{t('shop.sectionPremium', undefined, currentLocale)}</div>
     <div class="shop-grid">
       {#each premiumCards as card}
         <article class={`shop-card premium ${card.equipped ? 'equipped' : ''}`}>
@@ -140,18 +158,20 @@
           <div class="card-foot">
             <small>{requirementLabel(card, card.unlockState)}</small>
             {#if card.equipped}
-              <button class="equipped-btn" disabled>Equipped</button>
+              <button class="equipped-btn" disabled>{t('shop.actionEquipped', undefined, currentLocale)}</button>
             {:else if card.unlocked}
-              <button on:click={() => equip(card.id)}>Equip</button>
+              <button onclick={() => equip(card.id)}>{t('shop.actionEquip', undefined, currentLocale)}</button>
             {:else}
-              <button on:click={() => tryUnlockByAd(card.id)}>Get help (ad)</button>
+              <button onclick={() => tryUnlockByAd(card.id)}>
+                {t('shop.actionHelpAd', undefined, currentLocale)}
+              </button>
             {/if}
           </div>
         </article>
       {/each}
     </div>
 
-    <div class="section-title">Rare</div>
+    <div class="section-title">{t('shop.sectionRare', undefined, currentLocale)}</div>
     <div class="shop-grid">
       {#each rareCards as card}
         <article class={`shop-card rare ${card.equipped ? 'equipped' : ''}`}>
@@ -162,11 +182,11 @@
           <div class="card-foot">
             <small>{requirementLabel(card, card.unlockState)}</small>
             {#if card.equipped}
-              <button class="equipped-btn" disabled>Equipped</button>
+              <button class="equipped-btn" disabled>{t('shop.actionEquipped', undefined, currentLocale)}</button>
             {:else if card.unlocked}
-              <button on:click={() => equip(card.id)}>Equip</button>
+              <button onclick={() => equip(card.id)}>{t('shop.actionEquip', undefined, currentLocale)}</button>
             {:else}
-              <button class="locked-btn" disabled>Locked</button>
+              <button class="locked-btn" disabled>{t('shop.actionLocked', undefined, currentLocale)}</button>
             {/if}
           </div>
         </article>

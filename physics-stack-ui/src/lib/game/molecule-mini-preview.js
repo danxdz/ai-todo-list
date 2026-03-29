@@ -1,11 +1,11 @@
 import * as THREE from 'three';
+import { createMoleculePreviewGroup } from './molecule-preview-group.js';
 
 /**
- * Tiny 3D molecule-like cluster preview for win popup.
- * @param {HTMLElement} host
- * @param {{ atoms?: Array<{symbol: string, color: number, count: number}> }} payload
+ * Tiny 3D molecule-like cluster preview for win popup/lab.
+ * Returns a controller with `update(payload)` and `destroy()`.
  */
-export function mountMoleculeMiniPreview(host, payload) {
+export function mountMoleculeMiniPreview(host, initialPayload) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 30);
   camera.position.set(0, 0.2, 5.2);
@@ -24,55 +24,21 @@ export function mountMoleculeMiniPreview(host, payload) {
 
   const cluster = new THREE.Group();
   scene.add(cluster);
+  let current = null;
 
-  const geo = new THREE.SphereGeometry(0.55, 28, 22);
-  const mats = [];
-  const nodes = [];
-  const entries = Array.isArray(payload?.atoms) ? payload.atoms : [];
-  let index = 0;
-  for (const atom of entries) {
-    const color = atom?.color ?? 0x88bbff;
-    const n = Math.max(1, Math.min(3, atom?.count ?? 1));
-    for (let i = 0; i < n; i += 1) {
-      const mat = new THREE.MeshPhysicalMaterial({
-        color,
-        roughness: 0.2,
-        metalness: 0.06,
-        transmission: 0.62,
-        thickness: 0.9,
-        clearcoat: 0.45,
-        clearcoatRoughness: 0.1,
-        emissive: color,
-        emissiveIntensity: 0.1,
-        envMapIntensity: 1.05,
-      });
-      mats.push(mat);
-      const mesh = new THREE.Mesh(geo, mat);
-      const angle = (index / Math.max(1, entries.length * 2)) * Math.PI * 2;
-      const radius = 1.1 + (i % 2) * 0.42;
-      mesh.position.set(Math.cos(angle) * radius, Math.sin(angle * 1.3) * 0.55, Math.sin(angle) * 0.5);
-      const scale = 0.62 + Math.min(0.3, (atom?.count ?? 1) * 0.07);
-      mesh.scale.setScalar(scale);
-      cluster.add(mesh);
-      nodes.push(mesh);
-      index += 1;
-    }
-  }
-  if (nodes.length === 0) {
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: 0x88bbff,
-      roughness: 0.22,
-      metalness: 0.05,
-      transmission: 0.64,
-      thickness: 0.9,
-      clearcoat: 0.4,
-      emissive: 0x88bbff,
-      emissiveIntensity: 0.1,
+  function setPayload(payload) {
+    const next = createMoleculePreviewGroup({
+      recipe: payload?.recipe ?? null,
+      atoms: Array.isArray(payload?.atoms) ? payload.atoms : [],
+      detail: 'card',
+      locked: false,
     });
-    mats.push(mat);
-    const mesh = new THREE.Mesh(geo, mat);
-    cluster.add(mesh);
-    nodes.push(mesh);
+    if (current?.group) {
+      cluster.remove(current.group);
+      current.dispose?.();
+    }
+    current = next;
+    cluster.add(current.group);
   }
 
   function resize() {
@@ -91,23 +57,35 @@ export function mountMoleculeMiniPreview(host, payload) {
   const tick = () => {
     raf = requestAnimationFrame(tick);
     t += 0.016;
-    cluster.rotation.y += 0.012;
-    cluster.rotation.x = Math.sin(t * 0.8) * 0.1;
-    for (let i = 0; i < nodes.length; i += 1) {
-      const node = nodes[i];
-      node.position.y += Math.sin(t * 1.2 + i * 0.7) * 0.0009;
+    cluster.rotation.y += 0.008;
+    cluster.rotation.x = Math.sin(t * 0.62) * 0.06;
+    if (current?.spinNodes?.length) {
+      for (const spin of current.spinNodes) {
+        if (!spin?.node) continue;
+        spin.node.rotation.x += (spin.x ?? 0) * 0.016;
+        spin.node.rotation.y += (spin.y ?? 0) * 0.016;
+        spin.node.rotation.z += (spin.z ?? 0) * 0.016;
+      }
     }
     renderer.render(scene, camera);
   };
+  setPayload(initialPayload);
   tick();
 
-  return () => {
-    cancelAnimationFrame(raf);
-    ro.disconnect();
-    host.replaceChildren();
-    geo.dispose();
-    for (const m of mats) m.dispose();
-    renderer.dispose();
+  return {
+    update(nextPayload) {
+      setPayload(nextPayload);
+    },
+    destroy() {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      if (current?.group) {
+        cluster.remove(current.group);
+        current.dispose?.();
+      }
+      host.replaceChildren();
+      renderer.dispose();
+    },
   };
 }
 

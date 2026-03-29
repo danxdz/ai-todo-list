@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FRUITS } from './config-atoms.js';
+import { ELEMENTS } from './config-atoms.js';
 import { getAtomBallStyle } from './atom-ball-style.js';
 import { drawElementFace2d } from './atoms-element-face.js';
 
@@ -141,7 +141,7 @@ function addSkinOverlays(root, skinId, spec, radius) {
  * One renderer per card keeps integration simple and isolated.
  */
 export function mountAtomSkinPreview(host, skinId) {
-  const spec = FRUITS[7] ?? FRUITS[0];
+  const spec = ELEMENTS[7] ?? ELEMENTS[0];
   const style = getAtomBallStyle(7, spec, skinId);
 
   const scene = new THREE.Scene();

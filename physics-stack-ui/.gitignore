@@ -12,6 +12,7 @@ dev.err
 
 node_modules
 dist
+render-deploy
 dist-ssr
 *.local
 
@@ -26,15 +27,20 @@ dist-ssr
 *.sw?
 
 # Capacitor native local/build artifacts
+android/
 android/.gradle/
 android/local.properties
 android/**/build/
 android/captures/
+ios/
 ios/DerivedData/
 ios/App/Pods/
 ios/App/build/
 ios/App/App.xcworkspace/xcuserdata/
 ios/App/App.xcodeproj/xcuserdata/
+
+# Unused duplicate asset staging folder (runtime uses `public/background`)
+static/
 
 # Legacy vendored libs (runtime uses npm packages `three` and `cannon-es`)
 src/lib/game/cannon-es.js

@@ -1,9 +1,15 @@
-# Optional Render Blueprint — create a Web Service from this repo.
-# https://render.com/docs/blueprint-spec
 services:
   - type: web
-    name: fruit-merge-demo
-    runtime: python
-    plan: free
-    buildCommand: "true"
-    startCommand: python run_fruit_merge_demo.py
+    name: periodic-stack
+    runtime: static
+    rootDir: physics-stack-ui
+    buildCommand: npm ci && npm run build:render
+    staticPublishPath: render-deploy
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - physics-stack-ui/**
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

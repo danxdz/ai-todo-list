@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { FRUITS } from './config-atoms.js';
+import { ELEMENTS } from './config-atoms.js';
 import { getModeSpec } from './mode-specs.js';
+import { createMoleculePreviewGroup } from './molecule-preview-group.js';
 
 const atomsMode = getModeSpec('atoms');
-const typeByAtomicNumber = new Map(FRUITS.map((spec, index) => [spec.atomicNumber, index]));
+const typeByAtomicNumber = new Map(ELEMENTS.map((spec, index) => [spec.atomicNumber, index]));
 
 /**
  * Shared atom preview renderer for Album cards.
@@ -41,9 +42,10 @@ export function mountAtomAlbumPreview(host, options = {}) {
   const group = new THREE.Group();
   scene.add(group);
   const visuals = [];
+  let moleculePreview = null;
 
   function addVisual(type, radiusScale, position) {
-    const baseR = FRUITS[type]?.radius ?? 0.8;
+    const baseR = ELEMENTS[type]?.radius ?? 0.8;
     const radius = Math.max(0.18, baseR * radiusScale);
     const visual = atomsMode.createVisual(type, radius, { ghost: locked });
     visual.root.position.copy(position);
@@ -52,19 +54,8 @@ export function mountAtomAlbumPreview(host, options = {}) {
   }
 
   if (recipe?.inputs?.length) {
-    const counts = new Map();
-    for (const z of recipe.inputs) counts.set(z, (counts.get(z) ?? 0) + 1);
-    const picks = [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0] - b[0])
-      .slice(0, 5);
-    const total = Math.max(1, picks.length);
-    picks.forEach(([atomicNumber], i) => {
-      const type = typeByAtomicNumber.get(atomicNumber);
-      if (type == null) return;
-      const a = (Math.PI * 2 * i) / total;
-      const r = 0.72 + (i % 2) * 0.24;
-      addVisual(type, 0.2, new THREE.Vector3(Math.cos(a) * r, Math.sin(a * 1.2) * 0.28, Math.sin(a) * 0.2));
-    });
+    moleculePreview = createMoleculePreviewGroup({ recipe, detail: 'card', locked });
+    group.add(moleculePreview.group);
   } else {
     addVisual(typeIndex, 0.3, new THREE.Vector3(0, 0, 0));
   }
@@ -90,6 +81,14 @@ export function mountAtomAlbumPreview(host, options = {}) {
     for (let i = 0; i < visuals.length; i += 1) {
       visuals[i].root.rotation.y += 0.003 + i * 0.0009;
     }
+    if (moleculePreview?.spinNodes?.length) {
+      for (const spin of moleculePreview.spinNodes) {
+        if (!spin?.node) continue;
+        spin.node.rotation.x += (spin.x ?? 0) * 0.016;
+        spin.node.rotation.y += (spin.y ?? 0) * 0.016;
+        spin.node.rotation.z += (spin.z ?? 0) * 0.016;
+      }
+    }
     renderer.render(scene, camera);
   };
   tick();
@@ -101,8 +100,12 @@ export function mountAtomAlbumPreview(host, options = {}) {
       group.remove(visual.root);
       visual.dispose?.();
     }
+    if (moleculePreview) {
+      group.remove(moleculePreview.group);
+      moleculePreview.dispose?.();
+      moleculePreview = null;
+    }
     renderer.dispose();
     host.replaceChildren();
   };
 }
-

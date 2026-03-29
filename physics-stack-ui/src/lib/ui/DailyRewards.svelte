@@ -1,16 +1,21 @@
 <script lang="ts">
   import { locale, t } from '../app-i18n';
 
-  export let onBack: () => void = () => {};
-  export let onPlay: () => void = () => {};
+  type Props = {
+    onBack?: () => void;
+    onPlay?: () => void;
+  };
+
+  let { onBack = () => {}, onPlay = () => {} }: Props = $props();
 
   const STORAGE_KEY = 'physics-stack-daily-v1';
+  type DailyState = { day: number; streak: number; lastClaim: string };
 
-  function loadState() {
+  function loadState(): DailyState {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return { day: 1, streak: 0, lastClaim: '' };
-      return JSON.parse(raw);
+      return JSON.parse(raw) as DailyState;
     } catch {
       return { day: 1, streak: 0, lastClaim: '' };
     }
@@ -20,8 +25,8 @@
     return new Date().toISOString().slice(0, 10);
   }
 
-  let state = loadState();
-  let claimedToday = state.lastClaim === todayKey();
+  let state = $state<DailyState>(loadState());
+  const claimedToday = $derived(state.lastClaim === todayKey());
 
   function claimToday() {
     if (claimedToday) return;
@@ -30,12 +35,11 @@
       streak: state.streak + 1,
       lastClaim: todayKey(),
     };
-    claimedToday = true;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  $: currentLocale = $locale;
-  $: rewards = [
+  const currentLocale = $derived($locale);
+  const rewards = $derived([
     t('daily.reward1', undefined, currentLocale),
     t('daily.reward2', undefined, currentLocale),
     t('daily.reward3', undefined, currentLocale),
@@ -43,18 +47,18 @@
     t('daily.reward5', undefined, currentLocale),
     t('daily.reward6', undefined, currentLocale),
     t('daily.reward7', undefined, currentLocale),
-  ];
+  ]);
 </script>
 
 <section class="daily-shell">
   <div class="daily-head">
-    <button class="back-btn" on:click={onBack}>{t('common.back', undefined, currentLocale)}</button>
+    <button class="back-btn" onclick={onBack}>{t('common.back', undefined, currentLocale)}</button>
     <div>
       <p class="eyebrow">{t('daily.eyebrow', undefined, currentLocale)}</p>
       <h1>{t('daily.title', undefined, currentLocale)}</h1>
       <p>{t('daily.subtitle', undefined, currentLocale)}</p>
     </div>
-    <button class="play-btn" on:click={onPlay}>{t('common.playNow', undefined, currentLocale)}</button>
+    <button class="play-btn" onclick={onPlay}>{t('common.playNow', undefined, currentLocale)}</button>
   </div>
 
   <div class="streak-card">
@@ -65,7 +69,7 @@
         ? t('daily.claimedToday', undefined, currentLocale)
         : t('daily.claimPrompt', undefined, currentLocale)}
     </p>
-    <button class="claim-btn" disabled={claimedToday} on:click={claimToday}>
+    <button class="claim-btn" disabled={claimedToday} onclick={claimToday}>
       {claimedToday
         ? t('daily.claimedButton', undefined, currentLocale)
         : t('daily.claimToday', { day: state.day }, currentLocale)}

@@ -227,5 +227,22 @@ export function getAtomBallStyle(type, spec, skinId = 'default') {
     phase === 'gas' ? 0.34 : 0.24,
   );
 
+  const visualOverride = spec?.visual && typeof spec.visual === 'object' ? spec.visual : null;
+  if (visualOverride) {
+    const overrideNumber = (key, min, max) => {
+      const n = Number(visualOverride[key]);
+      if (!Number.isFinite(n)) return;
+      style[key] = clamp(n, min, max);
+    };
+    overrideNumber('roughness', 0, 1);
+    overrideNumber('metalness', 0, 1);
+    overrideNumber('transmission', 0, 1);
+    overrideNumber('clearcoat', 0, 1);
+    overrideNumber('clearcoatRoughness', 0, 1);
+    overrideNumber('ior', 1, 2.5);
+    overrideNumber('envMapIntensity', 0, 3);
+    overrideNumber('emissiveIntensity', 0, 1);
+  }
+
   return style;
 }

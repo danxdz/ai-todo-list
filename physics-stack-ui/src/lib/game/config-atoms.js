@@ -14,7 +14,7 @@ export { FRUIT_DENSITY, fruitMassForRadius } from './ball-mass.js';
 export const MERGE_DIST_MULT = 1.045;
 export const JACKPOT_MERGE_DIST_MULT = 1.12;
 
-export const FRUITS = [
+export const ELEMENTS = [
   { radius: 0.34, color: 0xffffff, symbol: 'H', name: 'Hydrogen', atomicNumber: 1, atomicMass: 1.008, phase: 'gas', family: 'nonmetal', fact: 'Atomic mass 1.008 u. Period 1, group 1.' },
   { radius: 0.574, color: 0xd9ffff, symbol: 'He', name: 'Helium', atomicNumber: 2, atomicMass: 4.002602, phase: 'gas', family: 'noble-gas', fact: 'Atomic mass 4.003 u. Period 1, group 18.' },
   { radius: 0.702, color: 0xcc80ff, symbol: 'Li', name: 'Lithium', atomicNumber: 3, atomicMass: 6.94, phase: 'solid', family: 'alkali-metal', fact: 'Atomic mass 6.940 u. Period 2, group 1.' },
@@ -135,9 +135,34 @@ export const FRUITS = [
   { radius: 2.6, color: 0x80d1ff, symbol: 'Og', name: 'Oganesson', atomicNumber: 118, atomicMass: 294, phase: 'solid', family: 'noble-gas', fact: 'Atomic mass 294.000 u. Period 7, group 18.' },
 ];
 
-export const MERGE_POINTS = FRUITS.map((e) => Math.round(e.atomicNumber * 12 + e.atomicMass * 0.45));
-export const MERGEABLE_TYPE_MAX = FRUITS.length - 2;
-export const MAX_RADIUS = FRUITS[FRUITS.length - 1].radius;
+// Backward-compatible alias for legacy shared-core naming.
+export const FRUITS = ELEMENTS;
+
+let ACTIVE_ATOM_ELEMENTS = ELEMENTS;
+
+export function setActiveAtomElements(elements) {
+  if (!Array.isArray(elements) || elements.length < 2) {
+    ACTIVE_ATOM_ELEMENTS = ELEMENTS;
+    return;
+  }
+  ACTIVE_ATOM_ELEMENTS = elements;
+}
+
+export function getActiveAtomElements() {
+  return ACTIVE_ATOM_ELEMENTS;
+}
+
+export function getActiveAtomSpec(type) {
+  return ACTIVE_ATOM_ELEMENTS[type] ?? ELEMENTS[type];
+}
+
+// Backward-compatible aliases (legacy naming).
+export const setActiveAtomFruits = setActiveAtomElements;
+export const getActiveAtomFruits = getActiveAtomElements;
+
+export const MERGE_POINTS = ELEMENTS.map((e) => Math.round(e.atomicNumber * 12 + e.atomicMass * 0.45));
+export const MERGEABLE_TYPE_MAX = ELEMENTS.length - 2;
+export const MAX_RADIUS = ELEMENTS[ELEMENTS.length - 1].radius;
 
 /**
  * Advanced chemistry layer (Atoms mode only).
@@ -165,6 +190,8 @@ export const MOLECULE_RECIPES = [
     color: 0xb7d5df,
     fact: 'CO2 helps trap heat in Earths atmosphere and fuels plant photosynthesis.',
     unlockLevel: 5,
+    detectBoost: 1.12,
+    priority: 4,
   },
   {
     id: 'ammonia',
@@ -211,6 +238,42 @@ export const MOLECULE_RECIPES = [
     unlockLevel: 7,
   },
   {
+    id: 'hydroxyl',
+    name: 'Hydroxyl',
+    formula: 'OH',
+    inputs: [8, 1],
+    points: 360,
+    multiplier: 3.0,
+    color: 0x9fe6ff,
+    fact: 'Hydroxyl radicals are highly reactive and important in atmospheric chemistry.',
+    unlockLevel: 5,
+    priority: 3,
+  },
+  {
+    id: 'hydrogen_fluoride',
+    name: 'Hydrogen Fluoride',
+    formula: 'HF',
+    inputs: [1, 9],
+    points: 420,
+    multiplier: 3.2,
+    color: 0xbdf7c4,
+    fact: 'Hydrogen fluoride is used to produce many fluorine-containing compounds.',
+    unlockLevel: 5,
+    priority: 4,
+  },
+  {
+    id: 'lithium_hydride',
+    name: 'Lithium Hydride',
+    formula: 'LiH',
+    inputs: [3, 1],
+    points: 460,
+    multiplier: 3.3,
+    color: 0xd5c8ff,
+    fact: 'Lithium hydride is a light ionic compound used in high-energy chemistry.',
+    unlockLevel: 5,
+    priority: 3,
+  },
+  {
     id: 'sodium_chloride',
     name: 'Sodium Chloride',
     formula: 'NaCl',
@@ -220,6 +283,150 @@ export const MOLECULE_RECIPES = [
     color: 0xfff3b0,
     fact: 'Table salt forms a crystal lattice of sodium and chloride ions.',
     unlockLevel: 8,
+  },
+  {
+    id: 'magnesium_oxide',
+    name: 'Magnesium Oxide',
+    formula: 'MgO',
+    inputs: [12, 8],
+    points: 610,
+    multiplier: 3.8,
+    color: 0xf5ffe9,
+    fact: 'Magnesium oxide is a high-melting ceramic used in refractories.',
+    unlockLevel: 6,
+  },
+  {
+    id: 'silicon_carbide',
+    name: 'Silicon Carbide',
+    formula: 'SiC',
+    inputs: [14, 6],
+    points: 720,
+    multiplier: 4.1,
+    color: 0xd8dfc8,
+    fact: 'Silicon carbide is an ultra-hard material used in abrasives and semiconductors.',
+    unlockLevel: 7,
+  },
+  {
+    id: 'carbon_monoxide',
+    name: 'Carbon Monoxide',
+    formula: 'CO',
+    inputs: [6, 8],
+    points: 430,
+    multiplier: 3.3,
+    color: 0xb2d2de,
+    fact: 'Carbon monoxide is colorless and dangerous because it binds to hemoglobin.',
+    unlockLevel: 8,
+    priority: 1,
+  },
+  {
+    id: 'nitric_oxide',
+    name: 'Nitric Oxide',
+    formula: 'NO',
+    inputs: [7, 8],
+    points: 500,
+    multiplier: 3.5,
+    color: 0x9ec3ff,
+    fact: 'Nitric oxide is a signaling molecule used by the body to relax blood vessels.',
+    unlockLevel: 6,
+  },
+  {
+    id: 'hydrogen_cyanide',
+    name: 'Hydrogen Cyanide',
+    formula: 'HCN',
+    inputs: [1, 6, 7],
+    points: 640,
+    multiplier: 4.0,
+    color: 0xaed8f0,
+    fact: 'Hydrogen cyanide is a small, linear molecule with important industrial uses.',
+    unlockLevel: 7,
+  },
+  {
+    id: 'nitrogen_dioxide',
+    name: 'Nitrogen Dioxide',
+    formula: 'NO2',
+    inputs: [7, 8, 8],
+    points: 620,
+    multiplier: 4.1,
+    color: 0xe8b082,
+    fact: 'Nitrogen dioxide contributes to urban smog and acid rain formation.',
+    unlockLevel: 6,
+  },
+  {
+    id: 'sulfur_dioxide',
+    name: 'Sulfur Dioxide',
+    formula: 'SO2',
+    inputs: [16, 8, 8],
+    points: 700,
+    multiplier: 4.3,
+    color: 0xffcc88,
+    fact: 'Sulfur dioxide is produced by volcanoes and burning sulfur-containing fuels.',
+    unlockLevel: 7,
+  },
+  {
+    id: 'sulfur_trioxide',
+    name: 'Sulfur Trioxide',
+    formula: 'SO3',
+    inputs: [16, 8, 8, 8],
+    points: 860,
+    multiplier: 4.8,
+    color: 0xffd694,
+    fact: 'Sulfur trioxide reacts quickly with water to form sulfuric acid.',
+    unlockLevel: 8,
+  },
+  {
+    id: 'nitric_acid',
+    name: 'Nitric Acid',
+    formula: 'HNO3',
+    inputs: [1, 7, 8, 8, 8],
+    points: 930,
+    multiplier: 5,
+    color: 0xc6f0ad,
+    fact: 'Nitric acid is widely used in fertilizers, dyes, and chemical synthesis.',
+    unlockLevel: 8,
+  },
+  {
+    id: 'sodium_hydroxide',
+    name: 'Sodium Hydroxide',
+    formula: 'NaOH',
+    inputs: [11, 8, 1],
+    points: 780,
+    multiplier: 4.4,
+    color: 0xe8f7ff,
+    fact: 'Sodium hydroxide is a strong base used in soap and paper manufacturing.',
+    unlockLevel: 8,
+  },
+  {
+    id: 'silicon_dioxide',
+    name: 'Silicon Dioxide',
+    formula: 'SiO2',
+    inputs: [14, 8, 8],
+    points: 910,
+    multiplier: 4.9,
+    color: 0xd7f0ff,
+    fact: 'Silicon dioxide is the main component of quartz and common sand.',
+    unlockLevel: 9,
+  },
+  {
+    id: 'calcium_carbonate',
+    name: 'Calcium Carbonate',
+    formula: 'CaCO3',
+    inputs: [20, 6, 8, 8, 8],
+    points: 1080,
+    multiplier: 5.4,
+    color: 0xf2f1e7,
+    fact: 'Calcium carbonate forms limestone, chalk, and many shells.',
+    unlockLevel: 10,
+  },
+  {
+    id: 'ethanol',
+    name: 'Ethanol',
+    formula: 'C2H6O',
+    inputs: [6, 6, 1, 1, 1, 1, 1, 1, 8],
+    points: 1160,
+    multiplier: 5.8,
+    color: 0xffe4bd,
+    fact: 'Ethanol is produced by fermentation and used as fuel and solvent.',
+    unlockLevel: 10,
   },
   {
     id: 'glucose',
@@ -233,6 +440,67 @@ export const MOLECULE_RECIPES = [
     unlockLevel: 10,
   },
 ];
+
+const MOLECULE_FX_PRESET_DEFAULT = {
+  atomScale: 0.42,
+  maxAtoms: 5,
+  burstRadius: 0.56,
+  startScale: 0.76,
+  peakScale: 1.28,
+  duration: 1.04,
+  rise: 0.3,
+  floatWave: 0.05,
+  spinSpeed: 1.3,
+  fadeStart: 0.42,
+  smokeAt: 0.5,
+  smokeCount: 12,
+  finalShatterAt: 0.8,
+  finalShatter: 10,
+  sparkCount: 14,
+};
+
+const MOLECULE_FX_PRESET_BY_ID = {
+  water: {
+    atomScale: 0.46,
+    maxAtoms: 5,
+    burstRadius: 0.62,
+    duration: 1.08,
+    smokeCount: 16,
+    sparkCount: 18,
+  },
+  methane: {
+    atomScale: 0.44,
+    maxAtoms: 6,
+    burstRadius: 0.64,
+    duration: 1.02,
+    finalShatter: 16,
+    sparkCount: 20,
+  },
+  glucose: {
+    atomScale: 0.36,
+    maxAtoms: 8,
+    burstRadius: 0.84,
+    peakScale: 1.46,
+    duration: 1.28,
+    rise: 0.42,
+    smokeCount: 24,
+    finalShatter: 28,
+    sparkCount: 26,
+  },
+};
+
+for (const recipe of MOLECULE_RECIPES) {
+  const inputCount = Array.isArray(recipe.inputs) ? recipe.inputs.length : 2;
+  const preset = MOLECULE_FX_PRESET_BY_ID[recipe.id] ?? {};
+  if (!Number.isFinite(recipe.fxIntensity)) {
+    recipe.fxIntensity = Math.max(0.82, Math.min(2.2, 0.86 + inputCount * 0.12));
+  }
+  recipe.presentation = {
+    ...MOLECULE_FX_PRESET_DEFAULT,
+    ...preset,
+    ...(recipe.presentation && typeof recipe.presentation === 'object' ? recipe.presentation : {}),
+  };
+}
 
 export const MOLECULE_UNLOCK_LEVEL = 5;
 export const MOLECULE_UNLOCK_DISCOVERED = 10;
@@ -262,3 +530,158 @@ export const COMBO_MULT_PER_TIER = 0.35;
 export const DANGER_PULSE_BAND = 1.35;
 export const DROP_VY_PER_LEVEL = 0.028;
 export const DROP_VY_LEVEL_CAP = 0.38;
+
+export const ATOM_VISUAL_DEFAULTS = {
+  coreScale: 0.74,
+  nucleusScale: 0.2,
+  nucleusOpacity: 0.96,
+  nucleusEmissive: 0.3,
+  cloudScale: 1.08,
+  cloudOpacity: 0.06,
+  cloudGlow: 0.14,
+  cloudSpin: 0.28,
+  electronCount: 3,
+  electronSpeed: 0.48,
+  shellCount: 3,
+  shellRadius: 1.08,
+  shellThickness: 0.01,
+  shellOpacity: 0.13,
+  shellSpin: 0.52,
+};
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function clampColor(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return clamp(Math.floor(n), 0x000000, 0xffffff);
+}
+
+function mixColor(a, b, t = 0.5) {
+  const p = clamp(Number(t) || 0, 0, 1);
+  const ar = (a >> 16) & 255;
+  const ag = (a >> 8) & 255;
+  const ab = a & 255;
+  const br = (b >> 16) & 255;
+  const bg = (b >> 8) & 255;
+  const bb = b & 255;
+  const r = Math.round(ar + (br - ar) * p);
+  const g = Math.round(ag + (bg - ag) * p);
+  const bch = Math.round(ab + (bb - ab) * p);
+  return (r << 16) | (g << 8) | bch;
+}
+
+/**
+ * Data-driven atom render profile.
+ * Each element may define `visual` in ELEMENTS entries to override these.
+ * Example:
+ * visual: { cloudOpacity: 0.2, shellCount: 3, nucleusScale: 0.16 }
+ */
+export function getAtomVisualProfile(spec) {
+  const z = spec?.atomicNumber ?? 1;
+  const phase = spec?.phase ?? 'solid';
+  const family = spec?.family ?? 'nonmetal';
+  const out = { ...ATOM_VISUAL_DEFAULTS };
+  const baseColor = clampColor(spec?.color) ?? 0x88bbff;
+
+  out.coreColor = mixColor(baseColor, 0x08101d, phase === 'gas' ? 0.2 : 0.12);
+  out.electronColor = mixColor(baseColor, 0xffffff, phase === 'gas' ? 0.62 : 0.46);
+  out.nucleusColor = mixColor(0xff9d7d, baseColor, family === 'transition-metal' ? 0.22 : 0.14);
+  out.protonColor = mixColor(0xff505f, baseColor, 0.18);
+  out.neutronColor = mixColor(0x96d4ff, baseColor, 0.22);
+  out.shellColor = mixColor(baseColor, 0xffef9c, phase === 'gas' ? 0.34 : 0.24);
+  out.haloColor = mixColor(baseColor, 0xffffff, 0.62);
+
+  if (phase === 'gas') {
+    out.coreScale = 0.72;
+    out.cloudScale = 1.12;
+    out.cloudOpacity = 0.12;
+    out.cloudGlow = 0.12;
+    out.nucleusScale = 0.11;
+    out.nucleusOpacity = 0.54;
+    out.shellCount = Math.max(out.shellCount, 2);
+    out.shellOpacity = 0.22;
+    out.shellSpin = 0.42;
+  } else if (phase === 'liquid') {
+    out.coreScale = 0.82;
+    out.cloudScale = 1.02;
+    out.cloudOpacity = 0.07;
+    out.nucleusScale = 0.14;
+    out.shellCount = Math.max(out.shellCount, 1);
+    out.shellOpacity = 0.1;
+  }
+
+  if (family === 'noble-gas') {
+    out.cloudScale += 0.08;
+    out.cloudOpacity += 0.04;
+    out.cloudGlow += 0.06;
+    out.nucleusScale = Math.max(0.12, out.nucleusScale - 0.02);
+    out.nucleusEmissive += 0.1;
+    out.shellCount = Math.max(out.shellCount, 2);
+    out.shellOpacity += 0.05;
+  } else if (family === 'transition-metal') {
+    out.coreScale += 0.06;
+    out.cloudScale -= 0.08;
+    out.cloudOpacity -= 0.04;
+    out.nucleusScale += 0.04;
+    out.nucleusOpacity += 0.06;
+    out.shellCount = 1;
+    out.shellSpin *= 0.85;
+  } else if (family === 'halogen') {
+    out.cloudOpacity += 0.03;
+    out.cloudGlow += 0.04;
+    out.shellCount = Math.max(out.shellCount, 3);
+    out.shellSpin += 0.08;
+  }
+
+  if (z <= 2) {
+    out.nucleusScale = Math.max(0.11, out.nucleusScale - 0.03);
+    out.shellCount = Math.max(1, Math.min(out.shellCount, 2));
+  } else if (z > 54) {
+    out.coreScale += 0.04;
+    out.nucleusScale += 0.03;
+    out.shellCount = Math.max(1, out.shellCount - 1);
+    out.cloudOpacity -= 0.015;
+  }
+
+  const custom = spec?.visual && typeof spec.visual === 'object' ? spec.visual : null;
+  if (custom) {
+    for (const key of Object.keys(custom)) {
+      out[key] = custom[key];
+    }
+  }
+
+  out.coreScale = clamp(out.coreScale, 0, 1.2);
+  out.nucleusScale = clamp(out.nucleusScale, 0, 1);
+  out.nucleusOpacity = clamp(out.nucleusOpacity, 0, 1);
+  out.nucleusEmissive = clamp(out.nucleusEmissive, 0, 0.6);
+  out.cloudScale = clamp(out.cloudScale, 0, 1.8);
+  out.cloudOpacity = clamp(out.cloudOpacity, 0, 0.32);
+  out.cloudGlow = clamp(out.cloudGlow, 0, 0.34);
+  out.cloudSpin = clamp(out.cloudSpin, 0, 1.2);
+  out.electronCount = Math.round(clamp(out.electronCount ?? out.shellCount ?? 2, 0, 8));
+  out.electronSpeed = clamp(out.electronSpeed ?? out.shellSpin ?? 0.34, 0, 1.8);
+  out.cloudSpin = clamp(Math.max(out.cloudSpin, out.electronSpeed * 0.55), 0, 1.2);
+  out.shellCount = Math.round(clamp(out.electronCount || out.shellCount, 0, 8));
+  out.shellRadius = clamp(out.shellRadius, 0, 1.6);
+  out.shellThickness = clamp(out.shellThickness, 0, 0.08);
+  out.shellOpacity = clamp(out.shellOpacity, 0, 0.4);
+  out.shellSpin = clamp(Math.max(out.shellSpin, out.electronSpeed), 0, 1.4);
+  const nucleusColor = clampColor(out.nucleusColor);
+  if (nucleusColor != null) out.nucleusColor = nucleusColor;
+  const electronColor = clampColor(out.electronColor);
+  if (electronColor != null) out.electronColor = electronColor;
+  const protonColor = clampColor(out.protonColor);
+  if (protonColor != null) out.protonColor = protonColor;
+  const neutronColor = clampColor(out.neutronColor);
+  if (neutronColor != null) out.neutronColor = neutronColor;
+  const coreColor = clampColor(out.coreColor);
+  if (coreColor != null) out.coreColor = coreColor;
+  const shellColor = clampColor(out.shellColor);
+  if (shellColor != null) out.shellColor = shellColor;
+  const haloColor = clampColor(out.haloColor);
+  if (haloColor != null) out.haloColor = haloColor;
+  return out;
+}

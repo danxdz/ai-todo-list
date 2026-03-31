@@ -49,7 +49,7 @@ export function mountAtomMiniPreview(host, initialPayload) {
 
   function setPayload(payload) {
     const type = findAtomTypeByAtomicNumber(payload?.spec?.atomicNumber);
-    const visual = modeSpec.createVisual(type, 0.88, {});
+    const visual = modeSpec.createVisual(type, 0.88, { spec: payload?.spec });
     if (current?.root) {
       root.remove(current.root);
       current.dispose?.();

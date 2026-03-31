@@ -29,6 +29,7 @@
     loadAtomVisualLabState,
     saveAtomVisualLabState,
     sanitizeAtomVisualLabState,
+    resolveAtomSpecForVisualState,
   } from '../game/atom-visual-lab.js';
 
   type Props = { onBack?: () => void };
@@ -136,6 +137,10 @@
         ? selectedAtomOverride.visual
         : {}) as Record<string, number>),
     },
+  });
+  /** Same resolved spec as gameplay (`applyAtomVisualOverrides`); use for 3D previews so layers/globals match. */
+  const atomPreviewSpec = $derived.by(() => {
+    return resolveAtomSpecForVisualState(selectedAtomZ, visualState) ?? selectedAtomSpec;
   });
   const atomRadiusMax = Math.max(...ATOM_ELEMENTS.map((spec) => Number(spec.radius) || 0.4), 0.4);
   const selectedAtomRadiusPercent = $derived.by(() => {
@@ -320,6 +325,9 @@
   }
 
   function makeLayer(type = 'cloud', base: Record<string, any> = {}) {
+    const t = String(type);
+    const defaultBlend = t === 'halo' ? 'additive' : t === 'cloud' ? 'normal' : null;
+    const blendRaw = base.blend === 'additive' || base.blend === 'normal' ? base.blend : defaultBlend;
     return {
       id: `${type}_${Math.random().toString(36).slice(2, 8)}`,
       type,
@@ -334,6 +342,8 @@
       orbitRadiusPct: clamp(Number(base.orbitRadiusPct ?? 100) || 0, 0, 180),
       spreadPct: clamp(Number(base.spreadPct ?? 0) || 0, 0, 100),
       tiltPct: clamp(Number(base.tiltPct ?? 50) || 0, 0, 100),
+      ...(t === 'cloud' || t === 'halo' ? { blend: blendRaw } : {}),
+      ...(t === 'cloud' ? { noiseMask: base.noiseMask === true } : {}),
     };
   }
 
@@ -1058,7 +1068,7 @@
     const payload = {
       kind,
       intensity: fxPreviewIntensity,
-      color: colorHexToNumber(colorNumberToHex(selectedAtomSpec?.color ?? 0x88bbff)),
+      color: colorHexToNumber(colorNumberToHex(atomPreviewSpec?.color ?? 0x88bbff)),
       profile,
       fxConfig: visualState?.fx ?? ATOM_FX_DEFAULTS,
     };
@@ -1162,11 +1172,13 @@
       if (!controller) {
         controller = mountMoleculeMiniPreview(node, {
           recipe: nextPayload.recipe,
+          visualState: nextPayload.visualState,
         } as any);
         return;
       }
       controller.update({
         recipe: nextPayload.recipe,
+        visualState: nextPayload.visualState,
       } as any);
     }
 
@@ -1246,7 +1258,7 @@
     const profileId = activeFxPreviewProfile?.id ?? '';
     const profileSig = JSON.stringify(activeFxPreviewProfile ?? null);
     const fxSig = JSON.stringify(visualState?.fx ?? ATOM_FX_DEFAULTS);
-    const previewSig = `${fxPreviewKind}:${fxPreviewIntensity}:${profileId}:${profileSig}:${fxSig}:${selectedAtomSpec?.color ?? 0}`;
+    const previewSig = `${fxPreviewKind}:${fxPreviewIntensity}:${profileId}:${profileSig}:${fxSig}:${atomPreviewSpec?.color ?? 0}`;
     if (!previewSig) return;
     scheduleFxPreview(fxPreviewKind);
   });
@@ -1587,6 +1599,7 @@
               <h4>Atom Layers</h4>
               <div class="actions">
                 <button class="ghost tiny" type="button" onclick={() => addAtomLayer('core')}>+ Core</button>
+                <button class="ghost tiny" type="button" onclick={() => addAtomLayer('outline')}>+ Outline</button>
                 <button class="ghost tiny" type="button" onclick={() => addAtomLayer('cloud')}>+ Cloud</button>
                 <button class="ghost tiny" type="button" onclick={() => addAtomLayer('shell')}>+ Shell</button>
                 <button class="ghost tiny" type="button" onclick={() => addAtomLayer('halo')}>+ Halo</button>
@@ -1639,6 +1652,32 @@
                   <label class="field"><span>Opacity %</span><input type="range" min="0" max="100" step="0.1" value={selectedAtomLayer.opacityPct ?? 100} oninput={(event) => updateAtomLayer(selectedAtomLayerIndex, { opacityPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
                   <label class="field"><span>Glow %</span><input type="range" min="0" max="100" step="0.1" value={selectedAtomLayer.glowPct ?? 0} oninput={(event) => updateAtomLayer(selectedAtomLayerIndex, { glowPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
                   <label class="field"><span>Spin %</span><input type="range" min="0" max="100" step="0.1" value={selectedAtomLayer.spinPct ?? 0} oninput={(event) => updateAtomLayer(selectedAtomLayerIndex, { spinPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
+                  {#if selectedAtomLayer.type === 'cloud' || selectedAtomLayer.type === 'halo'}
+                    <label class="field">
+                      <span>Blend</span>
+                      <select
+                        value={selectedAtomLayer.blend ?? (selectedAtomLayer.type === 'halo' ? 'additive' : 'normal')}
+                        onchange={(event) =>
+                          updateAtomLayer(selectedAtomLayerIndex, {
+                            blend: (event.currentTarget as HTMLSelectElement).value as 'normal' | 'additive',
+                          })}
+                      >
+                        <option value="normal">Normal (keeps true colors)</option>
+                        <option value="additive">Additive (glow / light)</option>
+                      </select>
+                    </label>
+                  {/if}
+                  {#if selectedAtomLayer.type === 'cloud'}
+                    <label class="field switch">
+                      <span>Noise mask</span>
+                      <input
+                        type="checkbox"
+                        checked={selectedAtomLayer.noiseMask === true}
+                        onchange={(event) =>
+                          updateAtomLayer(selectedAtomLayerIndex, { noiseMask: (event.currentTarget as HTMLInputElement).checked })}
+                      />
+                    </label>
+                  {/if}
                   {#if layerSupportsThickness(selectedAtomLayer)}
                     <label class="field"><span>Ring Thickness %</span><input type="range" min="0" max="100" step="0.1" value={selectedAtomLayer.thicknessPct ?? 0} oninput={(event) => updateAtomLayer(selectedAtomLayerIndex, { thicknessPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
                     <label class="field"><span>Ring Copies</span><input type="range" min="1" max="8" step="1" value={selectedAtomLayer.count ?? 1} oninput={(event) => updateAtomLayer(selectedAtomLayerIndex, { count: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
@@ -1877,7 +1916,7 @@
           {/if}
             </div>
             <aside class="editor-side">
-              <div class="preview-canvas preview-canvas-tall" use:atomPreview={{ spec: selectedAtomSpec }}></div>
+              <div class="preview-canvas preview-canvas-tall" use:atomPreview={{ spec: atomPreviewSpec }}></div>
               <p class="formula-note">
                 Live atom preview. Changes here update this viewport immediately.
               </p>
@@ -1905,7 +1944,7 @@
               {/each}
             </select>
           </label>
-          <div class="preview-canvas" use:moleculePreview={{ recipe: selectedMolecule }}></div>
+          <div class="preview-canvas" use:moleculePreview={{ recipe: selectedMolecule, visualState }}></div>
           <div class="mini-grid">
             <label class="field">
               <span>Points</span>
@@ -2115,11 +2154,13 @@
               oninput={(event) => patchGlobals({ atomGlobalScalePct: Number((event.currentTarget as HTMLInputElement).value) })}
             />
           </label>
+
           <div class="layers-card">
             <div class="layers-head">
               <h4>Global Layer Template</h4>
               <div class="actions">
                 <button class="ghost tiny" type="button" onclick={() => addGlobalLayer('core')}>+ Core</button>
+                <button class="ghost tiny" type="button" onclick={() => addGlobalLayer('outline')}>+ Outline</button>
                 <button class="ghost tiny" type="button" onclick={() => addGlobalLayer('cloud')}>+ Cloud</button>
                 <button class="ghost tiny" type="button" onclick={() => addGlobalLayer('shell')}>+ Shell</button>
                 <button class="ghost tiny" type="button" onclick={() => addGlobalLayer('halo')}>+ Halo</button>
@@ -2165,6 +2206,32 @@
                   <label class="field"><span>Opacity %</span><input type="range" min="0" max="100" step="0.1" value={selectedGlobalLayer.opacityPct ?? 100} oninput={(event) => updateGlobalLayer(selectedGlobalLayerIndex, { opacityPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
                   <label class="field"><span>Glow %</span><input type="range" min="0" max="100" step="0.1" value={selectedGlobalLayer.glowPct ?? 0} oninput={(event) => updateGlobalLayer(selectedGlobalLayerIndex, { glowPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
                   <label class="field"><span>Spin %</span><input type="range" min="0" max="100" step="0.1" value={selectedGlobalLayer.spinPct ?? 0} oninput={(event) => updateGlobalLayer(selectedGlobalLayerIndex, { spinPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
+                  {#if selectedGlobalLayer.type === 'cloud' || selectedGlobalLayer.type === 'halo'}
+                    <label class="field">
+                      <span>Blend</span>
+                      <select
+                        value={selectedGlobalLayer.blend ?? (selectedGlobalLayer.type === 'halo' ? 'additive' : 'normal')}
+                        onchange={(event) =>
+                          updateGlobalLayer(selectedGlobalLayerIndex, {
+                            blend: (event.currentTarget as HTMLSelectElement).value as 'normal' | 'additive',
+                          })}
+                      >
+                        <option value="normal">Normal (keeps true colors)</option>
+                        <option value="additive">Additive (glow / light)</option>
+                      </select>
+                    </label>
+                  {/if}
+                  {#if selectedGlobalLayer.type === 'cloud'}
+                    <label class="field switch">
+                      <span>Noise mask</span>
+                      <input
+                        type="checkbox"
+                        checked={selectedGlobalLayer.noiseMask === true}
+                        onchange={(event) =>
+                          updateGlobalLayer(selectedGlobalLayerIndex, { noiseMask: (event.currentTarget as HTMLInputElement).checked })}
+                      />
+                    </label>
+                  {/if}
                   {#if layerSupportsThickness(selectedGlobalLayer)}
                     <label class="field"><span>Ring Thickness %</span><input type="range" min="0" max="100" step="0.1" value={selectedGlobalLayer.thicknessPct ?? 0} oninput={(event) => updateGlobalLayer(selectedGlobalLayerIndex, { thicknessPct: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
                     <label class="field"><span>Ring Copies</span><input type="range" min="1" max="8" step="1" value={selectedGlobalLayer.count ?? 1} oninput={(event) => updateGlobalLayer(selectedGlobalLayerIndex, { count: Number((event.currentTarget as HTMLInputElement).value) })} /></label>
@@ -2247,7 +2314,7 @@
               use:fxPreviewViewport={{
                 kind: fxPreviewKind,
                 intensity: fxPreviewIntensity,
-                color: colorHexToNumber(colorNumberToHex(selectedAtomSpec?.color ?? 0x88bbff)),
+                color: colorHexToNumber(colorNumberToHex(atomPreviewSpec?.color ?? 0x88bbff)),
                 profile: activeFxPreviewProfile ?? null,
                 fxConfig: visualState?.fx ?? ATOM_FX_DEFAULTS,
               }}
@@ -2332,7 +2399,7 @@
                 />
               </label>
               <label class="field">
-                <span>Drop guide</span>
+                <span>Drop sight</span>
                 <input
                   type="range"
                   min="0"
@@ -2363,6 +2430,120 @@
                   value={visualState?.fx?.bondLinkIntensity ?? 1}
                   oninput={(event) => patchFx({ bondLinkIntensity: Number((event.currentTarget as HTMLInputElement).value) })}
                 />
+              </label>
+            </div>
+          </div>
+          <div class="layers-card">
+            <div class="layers-head">
+              <h4>Drop sight look</h4>
+            </div>
+            <p style="font-size: 12px; opacity: 0.75; margin: -4px 0 8px; line-height: 1.4">
+              Dash repeat count scales with line length. Density = how many dashes along the path. Colors −1 = follow next
+              ball / auto glow (
+              <a href="https://varun.ca/three-js-particles/" target="_blank" rel="noreferrer">dash offset</a>
+              ).
+            </p>
+            <div class="mini-grid">
+              <label class="field">
+                <span>Wobble</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.2"
+                  step="0.01"
+                  value={visualState?.fx?.dropSightWobble ?? 0}
+                  oninput={(event) => patchFx({ dropSightWobble: Number((event.currentTarget as HTMLInputElement).value) })}
+                />
+              </label>
+              <label class="field">
+                <span>Aim snap</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.2"
+                  step="0.01"
+                  value={visualState?.fx?.dropSightAimSnap ?? 2.2}
+                  oninput={(event) => patchFx({ dropSightAimSnap: Number((event.currentTarget as HTMLInputElement).value) })}
+                />
+              </label>
+              <label class="field">
+                <span>Dash flow</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.2"
+                  step="0.01"
+                  value={visualState?.fx?.dropSightFlow ?? 0.45}
+                  oninput={(event) => patchFx({ dropSightFlow: Number((event.currentTarget as HTMLInputElement).value) })}
+                />
+              </label>
+              <label class="field">
+                <span>Dash density</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.2"
+                  step="0.01"
+                  value={visualState?.fx?.dropSightDashDensity ?? 1}
+                  oninput={(event) => patchFx({ dropSightDashDensity: Number((event.currentTarget as HTMLInputElement).value) })}
+                />
+              </label>
+              <label class="field">
+                <span>Sight size</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.2"
+                  step="0.01"
+                  value={visualState?.fx?.dropSightSize ?? 1}
+                  oninput={(event) => patchFx({ dropSightSize: Number((event.currentTarget as HTMLInputElement).value) })}
+                />
+              </label>
+              <label class="field">
+                <span>Core color</span>
+                <span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                  <input
+                    type="color"
+                    value={colorNumberToHex(
+                      (visualState?.fx?.dropSightColorCore ?? -1) >= 0
+                        ? (visualState?.fx?.dropSightColorCore ?? 0xe8f4ff)
+                        : 0xe8f4ff,
+                      '#e8f4ff',
+                    )}
+                    oninput={(event) =>
+                      patchFx({ dropSightColorCore: colorHexToNumber((event.currentTarget as HTMLInputElement).value) })}
+                  />
+                  <button
+                    type="button"
+                    class="ghost tiny"
+                    onclick={() => patchFx({ dropSightColorCore: -1 })}
+                  >
+                    Ball
+                  </button>
+                </span>
+              </label>
+              <label class="field">
+                <span>Glow color</span>
+                <span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                  <input
+                    type="color"
+                    value={colorNumberToHex(
+                      (visualState?.fx?.dropSightColorGlow ?? -1) >= 0
+                        ? (visualState?.fx?.dropSightColorGlow ?? 0xaaccff)
+                        : 0xaaccff,
+                      '#aacdff',
+                    )}
+                    oninput={(event) =>
+                      patchFx({ dropSightColorGlow: colorHexToNumber((event.currentTarget as HTMLInputElement).value) })}
+                  />
+                  <button
+                    type="button"
+                    class="ghost tiny"
+                    onclick={() => patchFx({ dropSightColorGlow: -1 })}
+                  >
+                    Auto
+                  </button>
+                </span>
               </label>
             </div>
           </div>

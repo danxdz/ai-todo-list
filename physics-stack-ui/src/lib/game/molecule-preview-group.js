@@ -3,10 +3,13 @@ import { ELEMENTS } from './config-atoms.js';
 import { buildMoleculeLayout } from './molecule-layout.js';
 import { getAtomBallStyle } from './atom-ball-style.js';
 import { getEquippedAtomSkinDef } from './atom-skins.js';
-import { applyAtomVisualOverrides, loadAtomVisualLabState } from './atom-visual-lab.js';
+import { applyAtomVisualOverrides, loadAtomVisualLabState, sanitizeAtomVisualLabState } from './atom-visual-lab.js';
 
-function buildPreviewAtomMaps() {
-  const visualState = loadAtomVisualLabState();
+function buildPreviewAtomMaps(visualStateOverride = null) {
+  const visualState =
+    visualStateOverride && typeof visualStateOverride === 'object'
+      ? sanitizeAtomVisualLabState(visualStateOverride)
+      : loadAtomVisualLabState();
   const elements = applyAtomVisualOverrides(ELEMENTS, visualState);
   const byAtomic = new Map(elements.map((s, index) => [s.atomicNumber, { spec: s, type: index }]));
   const bySymbol = new Map(
@@ -46,11 +49,12 @@ function expandInputsFromAtoms(atoms) {
  *  recipe?: { id?: string, inputs?: number[] },
  *  atoms?: Array<{ atomicNumber?: number, count?: number }>,
  *  detail?: 'card' | 'popup',
- *  locked?: boolean
+ *  locked?: boolean,
+ *  visualState?: object | null — if set (e.g. live Physics Lab state), overrides localStorage for atom colors/layers
  * }} options
  */
 export function createMoleculePreviewGroup(options = {}) {
-  const { elements, byAtomic } = buildPreviewAtomMaps();
+  const { elements, byAtomic } = buildPreviewAtomMaps(options?.visualState ?? null);
   const recipe = options?.recipe ?? null;
   const detail = options?.detail === 'popup' ? 'popup' : 'card';
   const locked = !!options?.locked;

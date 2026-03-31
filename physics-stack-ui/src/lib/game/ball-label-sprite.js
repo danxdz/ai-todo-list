@@ -14,25 +14,40 @@ function makeCanvasTexture(drawFn) {
   return tex;
 }
 
-/** @param {{ symbol: string, name?: string, color: number }} spec */
+/** @param {{ symbol: string, name?: string, color?: number, ghost?: boolean }} spec */
 export function createElementSymbolSprite(spec) {
   const tex = makeCanvasTexture((ctx, s) => {
     ctx.clearRect(0, 0, s, s);
-    const sym = spec.symbol || '?';
-    ctx.shadowColor = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur = s * 0.035;
-    ctx.fillStyle = '#ffffff';
-    const fs = sym.length > 2 ? s * 0.28 : s * 0.38;
-    ctx.font = `800 ${fs}px system-ui, "Segoe UI", sans-serif`;
+    const sym = String(spec.symbol || '?').trim();
+    const len = sym.length;
+    let fs = s * 0.36;
+    if (len <= 1) fs = s * 0.42;
+    else if (len === 2) fs = s * 0.3;
+    else fs = s * 0.24;
+    const cx = s / 2;
+    const cy = s / 2 + s * 0.018;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(sym, s / 2, s / 2 - s * 0.02);
+    ctx.letterSpacing = len === 2 ? `${Math.max(0.5, s * 0.006)}px` : '0px';
+    ctx.font = `600 ${fs}px "Segoe UI", Roboto, "Helvetica Neue", system-ui, sans-serif`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.34)';
+    ctx.lineWidth = Math.max(1, s * 0.007);
+    ctx.lineJoin = 'round';
+    ctx.strokeText(sym, cx, cy);
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = s * 0.016;
+    ctx.shadowOffsetY = s * 0.004;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(sym, cx, cy);
     ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.letterSpacing = '0px';
     // Minimal atom labels: symbol only.
   });
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
+    opacity: spec.ghost ? 0.78 : 1,
     /** Occlude with other balls so labels don’t look like floating HUD stickers */
     depthTest: true,
     depthWrite: false,

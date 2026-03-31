@@ -97,18 +97,34 @@ export function drawElementFace2d(ctx, size, spec) {
     ctx.arc(s / 2, s / 2, s * 0.38, 0, Math.PI * 2);
     ctx.stroke();
   }
-  const sym = spec.symbol || '?';
-  const fs = sym.length > 2 ? s * 0.2 : s * 0.24;
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = s * 0.028;
-  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-  ctx.lineWidth = Math.max(1.1, s * 0.01);
-  ctx.fillStyle = 'rgba(248,252,255,0.92)';
-  ctx.font = `800 ${fs}px system-ui, "Segoe UI", sans-serif`;
+
+  const sym = String(spec.symbol || '?').trim();
+  const len = sym.length;
+  let fs = s * 0.16;
+  if (len <= 1) fs = s * 0.2;
+  else if (len === 2) fs = s * 0.15;
+  else fs = Math.max(s * 0.1, s * (0.14 - len * 0.008));
+
+  const cx = s * 0.5;
+  const cy = s * 0.5 + s * 0.012;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.strokeText(sym, s / 2, s / 2);
-  ctx.fillText(sym, s / 2, s / 2);
+  ctx.letterSpacing = len === 2 ? `${Math.max(0.5, s * 0.004)}px` : '0px';
+  ctx.font = `600 ${fs}px "Segoe UI", Roboto, "Helvetica Neue", system-ui, sans-serif`;
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = Math.max(1, s * 0.0045);
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.strokeText(sym, cx, cy);
+
+  ctx.shadowColor = 'rgba(0,0,0,0.2)';
+  ctx.shadowBlur = s * 0.01;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = s * 0.002;
+  ctx.fillStyle = 'rgba(255,255,255,0.93)';
+  ctx.fillText(sym, cx, cy);
   ctx.shadowBlur = 0;
-  // Keep atom face minimal: symbol only.
+  ctx.shadowOffsetY = 0;
+  ctx.letterSpacing = '0px';
 }

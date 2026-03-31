@@ -524,7 +524,7 @@ export const CUP_BASE = {
 };
 
 export const DROP_TYPE_MAX = 8;
-export const DROP_COOLDOWN_MS = 420;
+export const DROP_COOLDOWN_MS = 280;
 export const GAME_OVER_DWELL_SEC = 0.95;
 
 export const LEVEL_GOAL_START = 360;

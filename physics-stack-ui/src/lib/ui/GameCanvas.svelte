@@ -372,30 +372,43 @@
     --bg-tint-b: rgba(18, 20, 30, 0.88);
   }
 
+  /* Atoms: shell matches Three.js scene bg — image only, no extra dark stack. */
   .game-shell.atoms {
     --bg-image: url('/background/micro_atoms_2.jpg');
-    --bg-image-opacity: 0.5;
-    --bg-tint-a: rgba(9, 30, 27, 0.74);
-    --bg-tint-b: rgba(8, 20, 19, 0.88);
+    --bg-image-opacity: 1;
+    --bg-tint-a: transparent;
+    --bg-tint-b: transparent;
+    background: #c8e8df;
+  }
+
+  .game-shell.atoms::before {
+    filter: none;
+    background-size: cover;
+    background-position: center;
+    opacity: 1;
+  }
+
+  .game-shell.atoms::after {
+    background: none;
   }
 
   .game-shell.world-basics {
     --bg-image: url('/background/micro_atoms_1.jpg');
-    --bg-image-opacity: 0.5;
+    --bg-image-opacity: 1;
   }
 
   .game-shell.world-reactive {
     --bg-image: url('/background/micro_atoms_3.jpg');
-    --bg-image-opacity: 0.48;
-    --bg-tint-a: rgba(44, 22, 12, 0.74);
-    --bg-tint-b: rgba(33, 16, 10, 0.9);
+    --bg-image-opacity: 1;
+    --bg-tint-a: transparent;
+    --bg-tint-b: transparent;
   }
 
   .game-shell.world-metals {
     --bg-image: url('/background/micro_atoms_4.jpg');
-    --bg-image-opacity: 0.5;
-    --bg-tint-a: rgba(22, 32, 42, 0.76);
-    --bg-tint-b: rgba(14, 24, 34, 0.9);
+    --bg-image-opacity: 1;
+    --bg-tint-a: transparent;
+    --bg-tint-b: transparent;
   }
 
   .game-stage,
@@ -437,6 +450,11 @@
     justify-content: space-between;
     align-items: center;
     gap: 10px;
+  }
+
+  /* Atoms playfield is visually narrower; keep HUD aligned to it. */
+  .game-shell.atoms .top-controls {
+    width: min(420px, 100%);
   }
 
   .top-actions {

@@ -65,6 +65,20 @@ function drawContainImage(ctx, img, width, height, alpha = 1) {
   ctx.restore();
 }
 
+/** Cover (crop) — same idea as CSS background-size: cover. */
+function drawCoverImage(ctx, img, width, height, alpha = 1) {
+  if (!img || alpha <= 0) return;
+  const scale = Math.max(width / img.width, height / img.height);
+  const drawW = img.width * scale;
+  const drawH = img.height * scale;
+  const x = (width - drawW) * 0.5;
+  const y = (height - drawH) * 0.5;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(img, x, y, drawW, drawH);
+  ctx.restore();
+}
+
 function createLorenzTrail(seed = 0) {
   const s = seed * 0.17 + 1;
   return {
@@ -174,6 +188,11 @@ export function attachSceneBackground(scene, options = {}) {
     const img = state.imagesByUrl.get(state.currentUrl) ?? null;
     if (!img) {
       drawFallback(ctx, width, height, time);
+      return;
+    }
+
+    if (state.mode === 'atoms') {
+      drawCoverImage(ctx, img, width, height, 1);
       return;
     }
 

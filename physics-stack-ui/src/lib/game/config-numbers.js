@@ -46,7 +46,7 @@ export const CUP_BASE = {
 export const DROP_TYPE_MAX = 4;
 /** Early levels only drop the smallest tiers (0..DROP_START_MAX_INDEX); each level adds one more tier. */
 export const DROP_START_MAX_INDEX = 3;
-export const DROP_COOLDOWN_MS = 420;
+export const DROP_COOLDOWN_MS = 280;
 export const GAME_OVER_DWELL_SEC = 0.95;
 
 /** Softer curve — fewer “impossible” jumps between levels */

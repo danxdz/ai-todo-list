@@ -42,14 +42,30 @@ export function createJuice(scene, options = {}) {
   let tintInFlight = false;
   const tmpObj = new THREE.Object3D();
   const tmpColor = new THREE.Color();
+  const tmpWhite = new THREE.Color(0xffffff);
+  const tmpLerpWhite = new THREE.Color(0xffffff);
   const FX_DEFAULTS = {
     ambientDensity: 1,
     sparkDensity: 1,
     trailDensity: 1,
     dropletDensity: 1,
     bondLinkIntensity: 1,
-    /** 0 = off: electron-like particles along drop line toward the queue / bottom HUD. */
+    /** 0 = off: persistent drop aim line while playing. */
     dropTrailDensity: 1,
+    /** Sideways wobble of the aim path. 0 = straight column. */
+    dropSightWobble: 0,
+    /** Dash scroll speed along the line (lower = calmer). */
+    dropSightFlow: 0.45,
+    /** Dash repeats along the sight line (higher = more dashes; uses path length). */
+    dropSightDashDensity: 1,
+    /** Tick width / line presence (higher = larger brackets, slightly bolder read). */
+    dropSightSize: 1,
+    /** Core line color; -1 = use next ball color. */
+    dropSightColorCore: -1,
+    /** Glow / outer dash color; -1 = derived from core. */
+    dropSightColorGlow: -1,
+    /** Horizontal follow: 2.2 = locked to aim (most responsive); lower softens motion. */
+    dropSightAimSnap: 2.2,
   };
   const fxConfig = { ...FX_DEFAULTS };
 
@@ -63,6 +79,21 @@ export function createJuice(scene, options = {}) {
       if (!Number.isFinite(n)) return FX_DEFAULTS[key];
       return clamp(n, 0, 2.2);
     };
+    const readDashDensity = () => {
+      const v = Number(next.dropSightDashDensity);
+      if (Number.isFinite(v)) return clamp(v, 0, 2.2);
+      const old = Number(next.dropSightDash);
+      if (Number.isFinite(old)) {
+        return clamp(0.15 + (2.2 - old) * 0.9, 0, 2.2);
+      }
+      return FX_DEFAULTS.dropSightDashDensity;
+    };
+    const readColorOpt = (key) => {
+      const v = Number(next[key]);
+      if (!Number.isFinite(v)) return FX_DEFAULTS[key];
+      if (v < 0) return -1;
+      return (Math.floor(v) >>> 0) & 0xffffff;
+    };
     return {
       ambientDensity: read('ambientDensity'),
       sparkDensity: read('sparkDensity'),
@@ -70,6 +101,13 @@ export function createJuice(scene, options = {}) {
       dropletDensity: read('dropletDensity'),
       bondLinkIntensity: read('bondLinkIntensity'),
       dropTrailDensity: read('dropTrailDensity'),
+      dropSightWobble: read('dropSightWobble'),
+      dropSightFlow: read('dropSightFlow'),
+      dropSightDashDensity: readDashDensity(),
+      dropSightSize: read('dropSightSize'),
+      dropSightColorCore: readColorOpt('dropSightColorCore'),
+      dropSightColorGlow: readColorOpt('dropSightColorGlow'),
+      dropSightAimSnap: read('dropSightAimSnap'),
     };
   }
 
@@ -346,16 +384,6 @@ export function createJuice(scene, options = {}) {
       }
       return;
     }
-    if (event.kind === 'dropGuide') {
-      removeFromScene(event.group);
-      if (Array.isArray(event.streams)) {
-        for (const s of event.streams) {
-          s?.pts?.geometry?.dispose?.();
-          s?.material?.dispose?.();
-        }
-      }
-      return;
-    }
     removeFromScene(event.lines);
     event.lines.geometry?.dispose?.();
     event.lines.material?.dispose?.();
@@ -420,82 +448,206 @@ export function createJuice(scene, options = {}) {
   }
 
   /**
-   * Short “electron” trail from drop height down toward the queue / bottom strip (merge-game style).
-   * @param {number} worldX
-   * @param {number} yTop - world Y at drop line (higher)
-   * @param {number} yBottom - world Y near queue / HUD (lower)
-   * @param {number} worldZ
-   * @param {number} [color]
-   * @param {{ intensity?: number, style?: string }} [options]
+   * Drop aim: CatmullRom path + LineDashedMaterial with animated dashOffset (see
+   * https://varun.ca/three-js-particles/ — dashed line with animated offset). Uses core Three.js
+   * lines (no MeshLine) for Three r183 compatibility.
    */
-  function addDropGuideTrail(worldX, yTop, yBottom, worldZ, color, options = {}) {
+  const DROP_AIM_MAX_RES = 192;
+  const DROP_AIM_CTRL = 28;
+  let dropAimGroup = null;
+  let dropAimCurveGeo = null;
+  let dropAimGlowLine = null;
+  let dropAimCoreLine = null;
+  let dropAimGlowDashedMat = null;
+  let dropAimCoreDashedMat = null;
+  let dropAimPosBuffer = null;
+  let dropAimSampleVec = null;
+  let dropAimCtrlPool = null;
+  /** Smoothed world X when dropSightAimSnap is below max. */
+  let dropAimSmoothedX = null;
+
+  function initDropAimSight() {
+    dropAimSampleVec = new THREE.Vector3();
+    dropAimCtrlPool = Array.from({ length: DROP_AIM_CTRL }, () => new THREE.Vector3());
+
+    dropAimGroup = new THREE.Group();
+    dropAimGroup.name = 'dropAimSight';
+    dropAimGroup.renderOrder = 960;
+    dropAimGroup.frustumCulled = false;
+    dropAimGroup.visible = false;
+
+    dropAimPosBuffer = new Float32Array(DROP_AIM_MAX_RES * 3);
+    dropAimCurveGeo = new THREE.BufferGeometry();
+    dropAimCurveGeo.setAttribute('position', new THREE.BufferAttribute(dropAimPosBuffer, 3));
+    dropAimCurveGeo.setDrawRange(0, 2);
+
+    dropAimGlowDashedMat = new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.42,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      dashSize: 0.1,
+      gapSize: 0.08,
+      scale: 1,
+    });
+    dropAimGlowLine = new THREE.Line(dropAimCurveGeo, dropAimGlowDashedMat);
+    dropAimGlowLine.renderOrder = 961;
+
+    dropAimCoreDashedMat = new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.88,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      dashSize: 0.07,
+      gapSize: 0.055,
+      scale: 1,
+    });
+    dropAimCoreLine = new THREE.Line(dropAimCurveGeo, dropAimCoreDashedMat);
+    dropAimCoreLine.renderOrder = 962;
+
+    dropAimGroup.add(dropAimGlowLine);
+    dropAimGroup.add(dropAimCoreLine);
+    scene.add(dropAimGroup);
+  }
+
+  /**
+   * @param {{ active?: boolean, worldX?: number, yTop?: number, yBottom?: number, worldZ?: number, color?: number, dt?: number }} opts
+   */
+  function updateDropAimSight(opts = {}) {
+    if (!dropAimGroup || !dropAimCurveGeo) return;
     const dropD = fxScale('dropTrailDensity');
-    if (dropD <= 0.001) return;
-    const vivid = options.style !== 'lite';
-    const i = Math.max(
-      0.35,
-      Math.min(vivid ? 2.4 : 1.6, (options.intensity ?? 1) * (0.45 + dropD * 0.55)),
-    );
-    while (trailEvents.length >= MAX_TRAIL_EVENTS) {
-      disposeTrailEvent(trailEvents.shift());
+    const active = opts.active !== false && Number.isFinite(opts.worldX) && dropD > 0.001;
+    if (!active) {
+      dropAimGroup.visible = false;
+      dropAimSmoothedX = null;
+      return;
     }
-    let yHi = yTop;
-    let yLo = yBottom;
+    let yHi = Number(opts.yTop);
+    let yLo = Number(opts.yBottom);
+    if (!Number.isFinite(yHi) || !Number.isFinite(yLo)) {
+      dropAimGroup.visible = false;
+      dropAimSmoothedX = null;
+      return;
+    }
     if (yLo > yHi) {
       const t = yHi;
       yHi = yLo;
       yLo = t;
     }
-    const span = Math.max(0.2, yHi - yLo);
-    const palette = buildTrailColorSet(color, vivid);
-    const group = new THREE.Group();
-    group.position.set(worldX, yLo, worldZ);
-    group.renderOrder = 920;
-    group.frustumCulled = false;
-    scene.add(group);
+    const span = Math.max(0.15, yHi - yLo);
+    const worldX = opts.worldX;
+    const worldZ = Number.isFinite(opts.worldZ) ? opts.worldZ : 0;
+    const wobbleScale = fxScale('dropSightWobble');
+    const flowScale = fxScale('dropSightFlow');
+    const dashDensity = fxScale('dropSightDashDensity');
+    const aimSnap = fxScale('dropSightAimSnap');
+    const dt = Number(opts.dt);
+    const tAnim = performance.now() * 0.001;
 
-    const streamCount = Math.max(2, Math.round(3 + i * 2.2));
-    const dotsPerStream = Math.max(10, Math.round(14 + i * 10));
-    const streams = [];
-    for (let s = 0; s < streamCount; s += 1) {
-      const hex = palette[s % palette.length];
-      const mat = new THREE.PointsMaterial({
-        color: hex,
-        size: Math.max(0.028, 0.034 + i * 0.012),
-        transparent: true,
-        opacity: Math.min(0.95, 0.42 + i * 0.14),
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-      });
-      const positions = new Float32Array(dotsPerStream * 3);
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      const pts = new THREE.Points(geo, mat);
-      pts.frustumCulled = false;
-      group.add(pts);
-      streams.push({
-        pts,
-        positions,
-        material: mat,
-        baseOpacity: mat.opacity,
-        xOff: (Math.random() - 0.5) * 0.12,
-        phaseOff: Math.random(),
-        wobble: 0.6 + Math.random() * 0.8,
-        dotCount: dotsPerStream,
-      });
+    let aimX = worldX;
+    if (aimSnap >= 2.12) {
+      dropAimSmoothedX = worldX;
+    } else {
+      if (dropAimSmoothedX == null || !Number.isFinite(dropAimSmoothedX)) {
+        dropAimSmoothedX = worldX;
+      }
+      const k = Math.min(1, (Number.isFinite(dt) && dt > 0 ? dt : 1 / 60) * (3.5 + aimSnap * 26));
+      dropAimSmoothedX += (worldX - dropAimSmoothedX) * k;
+      aimX = dropAimSmoothedX;
     }
 
-    trailEvents.push({
-      kind: 'dropGuide',
-      group,
-      streams,
-      span,
-      life: 0,
-      maxLife: Math.min(0.95, 0.42 + span * 0.08),
-      flowPhase: 0,
-      flowSpeed: Math.max(1.2, 2.4 + i * 0.5),
-    });
+    dropAimGroup.position.set(aimX, 0, worldZ);
+    dropAimGroup.visible = true;
+
+    const res = Math.min(DROP_AIM_MAX_RES - 1, lowPerfDevice ? 96 : 168);
+    const buf = dropAimPosBuffer;
+    const v = dropAimSampleVec;
+
+    if (wobbleScale < 0.035) {
+      for (let i = 0; i <= res; i += 1) {
+        const u = i / res;
+        const y = yLo + span * u;
+        const o = i * 3;
+        buf[o] = 0;
+        buf[o + 1] = y;
+        buf[o + 2] = 0;
+      }
+    } else {
+      const cn = Math.min(DROP_AIM_CTRL - 1, lowPerfDevice ? 13 : 21);
+      const wMag = wobbleScale * 0.065 * Math.min(1.1, span / 5.5);
+      for (let i = 0; i <= cn; i += 1) {
+        const u = i / cn;
+        const y = yLo + span * u;
+        const env = Math.sin(u * Math.PI);
+        const ph = tAnim * 2.2;
+        const wx =
+          wMag * env * Math.sin(ph * 1.15 + u * 14.2 + Math.cos(u * 6.3) * 0.4);
+        const wz = wMag * env * 0.72 * Math.cos(ph * 0.95 + u * 11.8 + Math.sin(u * 5.1) * 0.35);
+        dropAimCtrlPool[i].set(wx, y, wz);
+      }
+
+      const curve = new THREE.CatmullRomCurve3(dropAimCtrlPool.slice(0, cn + 1));
+      for (let i = 0; i <= res; i += 1) {
+        curve.getPoint(i / res, v);
+        const o = i * 3;
+        buf[o] = v.x;
+        buf[o + 1] = v.y;
+        buf[o + 2] = v.z;
+      }
+    }
+    dropAimCurveGeo.attributes.position.needsUpdate = true;
+    dropAimCurveGeo.setDrawRange(0, res + 1);
+
+    dropAimGlowLine.computeLineDistances();
+
+    const ldAttr = dropAimCurveGeo.getAttribute('lineDistance');
+    let pathLen = span;
+    if (ldAttr?.array?.length) {
+      const a = ldAttr.array;
+      pathLen = Math.max(0.02, a[a.length - 1]);
+    }
+    // Small, lively dashes: cycles scales with path length so density feels consistent.
+    const cycles = Math.max(6, Math.min(160, Math.round((8 + dashDensity * 64) * Math.max(0.7, Math.min(1.4, pathLen / 7.2)))));
+    const cycleLen = pathLen / cycles;
+    const onRatio = 0.22;
+    dropAimGlowDashedMat.dashSize = Math.max(0.012, cycleLen * (onRatio + 0.08));
+    dropAimGlowDashedMat.gapSize = Math.max(0.012, cycleLen * (1 - onRatio - 0.08));
+    dropAimCoreDashedMat.dashSize = Math.max(0.01, cycleLen * onRatio);
+    dropAimCoreDashedMat.gapSize = Math.max(0.01, cycleLen * (1 - onRatio));
+
+    const speed =
+      (0.75 + flowScale * 4.6) *
+      (0.55 + dropD * 0.45) *
+      Math.max(0.7, Math.min(2.4, 0.16 / cycleLen));
+    // Always time-based: avoids dt quirks and guarantees visible motion.
+    const phase = -tAnim * speed;
+    dropAimGlowDashedMat.dashOffset = phase;
+    dropAimCoreDashedMat.dashOffset = phase * 1.12 + cycleLen * onRatio * 0.35;
+
+    const ballHex = opts.color ?? 0xe8f4ff;
+    const coreOpt = Number(fxConfig.dropSightColorCore);
+    if (Number.isFinite(coreOpt) && coreOpt >= 0) {
+      tmpColor.set(coreOpt >>> 0);
+    } else {
+      tmpColor.set(ballHex);
+    }
+    const glowOpt = Number(fxConfig.dropSightColorGlow);
+    if (Number.isFinite(glowOpt) && glowOpt >= 0) {
+      tmpWhite.set(glowOpt >>> 0);
+    } else {
+      tmpWhite.copy(tmpColor).lerp(tmpLerpWhite.set(0xffffff), 0.16);
+    }
+    dropAimGlowDashedMat.color.copy(tmpWhite);
+    dropAimCoreDashedMat.color.copy(tmpColor).lerp(tmpWhite, 0.2);
+
+    const pulse = 0.88 + 0.12 * Math.sin(performance.now() / 280);
+    const a = pulse * Math.min(1.12, 0.32 + dropD * 0.5);
+    dropAimGlowDashedMat.opacity = Math.min(0.48, 0.14 + dropD * 0.12) * a;
+    dropAimCoreDashedMat.opacity = Math.min(0.96, 0.48 + dropD * 0.22) * a;
   }
 
   function addOrbitTrailEvent(worldX, worldY, worldZ, color, intensity = 1, style = 'full', options = {}) {
@@ -929,30 +1081,6 @@ export function createJuice(scene, options = {}) {
           item.points.rotation.z = Math.sin(ev.life * item.wobbleSpeed + item.wobblePhase) * 0.035;
           item.points.geometry.attributes.position.needsUpdate = true;
           item.material.opacity = Math.max(0, item.baseOpacity * fade * pulse);
-        }
-        if (u >= 1) {
-          disposeTrailEvent(ev);
-          trailEvents.splice(i, 1);
-        }
-        continue;
-      }
-      if (ev.kind === 'dropGuide') {
-        const u = Math.min(1, ev.life / ev.maxLife);
-        const fade = 1 - u;
-        ev.flowPhase += dt * ev.flowSpeed;
-        const span = ev.span;
-        for (const s of ev.streams) {
-          const pos = s.positions;
-          const n = s.dotCount;
-          for (let d = 0; d < n; d += 1) {
-            const p = (ev.flowPhase * 1.1 + s.phaseOff + d / n) % 1;
-            const yLocal = span * (1 - p);
-            pos[d * 3 + 0] = s.xOff + Math.sin(ev.life * 7.2 + d * 0.6 + s.wobble) * 0.042;
-            pos[d * 3 + 1] = yLocal;
-            pos[d * 3 + 2] = Math.cos(ev.life * 5.4 + d * 0.4) * 0.05;
-          }
-          s.pts.geometry.attributes.position.needsUpdate = true;
-          s.material.opacity = Math.max(0, s.baseOpacity * fade * fade);
         }
         if (u >= 1) {
           disposeTrailEvent(ev);
@@ -1697,10 +1825,19 @@ export function createJuice(scene, options = {}) {
     ambientMat.dispose();
     sparkGeo.dispose();
     sparkMat.dispose();
+    if (dropAimGroup) {
+      scene.remove(dropAimGroup);
+      dropAimCurveGeo?.dispose?.();
+      dropAimGlowDashedMat?.dispose?.();
+      dropAimCoreDashedMat?.dispose?.();
+      dropAimGroup = null;
+      dropAimSmoothedX = null;
+    }
   }
 
   initAmbientParticles();
   initSparkPool();
+  initDropAimSight();
   setFxConfig(options.fxConfig ?? {});
 
   return {
@@ -1721,7 +1858,7 @@ export function createJuice(scene, options = {}) {
     playFxProfileStack,
     setFxConfig,
     getFxConfig,
-    addDropGuideTrail,
+    updateDropAimSight,
     updateParticles,
     computePileStress,
     updateDangerLine,

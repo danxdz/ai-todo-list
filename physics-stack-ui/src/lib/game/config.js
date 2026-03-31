@@ -36,7 +36,7 @@ export const CUP_BASE = {
 };
 
 export const DROP_TYPE_MAX = 3;
-export const DROP_COOLDOWN_MS = 420;
+export const DROP_COOLDOWN_MS = 280;
 export const GAME_OVER_DWELL_SEC = 0.95;
 
 /** Level pacing — higher goals & steeper curve = slower unlocks, more pressure */

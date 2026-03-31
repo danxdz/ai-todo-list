@@ -4,8 +4,8 @@ import * as numbersConfig from './config-numbers.js';
 import * as atomsConfig from './config-atoms.js';
 import {
   createNumberDigitPlane,
-  setNumberPlaneScale,
   placeDigitPlaneInFrontOfSphere,
+  setNumberPlaneScale,
 } from './ball-label-sprite.js';
 import { drawElementFace2d } from './atoms-element-face.js';
 import { getAtomBallStyle } from './atom-ball-style.js';
@@ -246,8 +246,19 @@ function createNumberVisual(type, radius, { ghost = false } = {}) {
   };
 }
 
-function createAtomVisual(type, radius, { ghost = false } = {}) {
-  const spec = atomsConfig.getActiveAtomSpec(type) ?? atomsConfig.FRUITS[type];
+function mergeAtomSpecForPreview(base, override) {
+  if (!override || typeof override !== 'object') return base;
+  if (Number(override.atomicNumber) !== Number(base?.atomicNumber)) return base;
+  return {
+    ...base,
+    ...override,
+    visual: { ...(base?.visual ?? {}), ...(override?.visual ?? {}) },
+  };
+}
+
+function createAtomVisual(type, radius, { ghost = false, spec: specOverride } = {}) {
+  const baseSpec = atomsConfig.getActiveAtomSpec(type) ?? atomsConfig.FRUITS[type];
+  const spec = mergeAtomSpecForPreview(baseSpec, specOverride);
   const skin = getEquippedAtomSkinDef();
   const skinId = skin?.id ?? 'default';
   const visual = atomsConfig.getAtomVisualProfile?.(spec) ?? atomsConfig.ATOM_VISUAL_DEFAULTS;
@@ -274,6 +285,9 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
   const shellOpacity = visual.shellOpacity ?? 0.08;
   const shellSpin = visual.shellSpin ?? 0.16;
   const coreColor = Number.isFinite(visual.coreColor) ? Number(visual.coreColor) : style.color;
+  /** Body color from data (`spec.color`); outer layers default to this instead of profile whites (electron/halo mix). */
+  const primaryChroma =
+    Number.isFinite(spec?.color) ? ((Math.floor(Number(spec.color)) >>> 0) & 0xffffff) : coreColor;
   const material = new THREE.MeshPhysicalMaterial({
     color: coreColor,
     map: faceMap,
@@ -301,10 +315,10 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
   function buildLayeredAtom() {
     if (explicitLayers.length <= 0) return false;
     const defaultCoreColor = Number.isFinite(visual.coreColor) ? Number(visual.coreColor) : style.color;
-    const defaultNucleusColor = Number.isFinite(visual.nucleusColor) ? Number(visual.nucleusColor) : style.color;
-    const defaultCloudColor = Number.isFinite(visual.electronColor) ? Number(visual.electronColor) : style.color;
-    const defaultShellColor = Number.isFinite(visual.shellColor) ? Number(visual.shellColor) : defaultCloudColor;
-    const defaultHaloColor = Number.isFinite(visual.haloColor) ? Number(visual.haloColor) : defaultCloudColor;
+    const defaultNucleusColor = primaryChroma;
+    const defaultCloudColor = primaryChroma;
+    const defaultShellColor = primaryChroma;
+    const defaultHaloColor = primaryChroma;
 
     let primaryCoreAssigned = false;
     for (let index = 0; index < explicitLayers.length; index += 1) {
@@ -319,6 +333,8 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
       const colorValue =
         Number.isFinite(layer?.color)
           ? Number(layer.color)
+          : typeName === 'outline'
+            ? defaultCoreColor
           : typeName === 'nucleus'
             ? defaultNucleusColor
             : typeName === 'cloud'
@@ -328,6 +344,30 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
                 : typeName === 'halo'
                   ? defaultHaloColor
                   : defaultCoreColor;
+
+      if (typeName === 'outline') {
+        const outlineOpacity = ghost ? opacityBase * 0.5 : opacityBase;
+        const thicknessPct = Math.max(0, Number(layer?.thicknessPct ?? 35) || 0) / 100;
+        const extra = Math.max(radius * 0.004, radius * (0.01 + thicknessPct * 0.06));
+        const outlineRadius = Math.max(0.0005, layerRadius + extra);
+        const mat = new THREE.MeshBasicMaterial({
+          color: colorValue,
+          transparent: true,
+          opacity: outlineOpacity,
+          depthWrite: false,
+          side: THREE.BackSide,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1,
+        });
+        const outline = new THREE.Mesh(new THREE.SphereGeometry(outlineRadius, 24, 18), mat);
+        outline.renderOrder = index * 10;
+        root.add(outline);
+        if (spinBase > 0.001) {
+          spinNodes.push({ node: outline, x: 0, y: spinBase * 0.25, z: 0 });
+        }
+        continue;
+      }
 
       if (layerRadius <= 0.0005 && typeName !== 'shell') continue;
 
@@ -356,6 +396,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
           const tilt = 0.18 + tiltMul * 1.04;
           shell.rotation.x = tilt + i * (0.32 + tiltMul * 0.3) + index * 0.06;
           shell.rotation.y = 0.12 + i * (0.22 + tiltMul * 0.2) + index * 0.05;
+          shell.renderOrder = index * 10;
           root.add(shell);
           spinNodes.push({
             node: shell,
@@ -369,13 +410,18 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
 
       const isPrimaryCore = typeName === 'core' && !primaryCoreAssigned;
       const useFaceMap = isPrimaryCore;
-      const isAdditive = typeName === 'cloud' || typeName === 'halo';
+      const blendHint =
+        layer?.blend === 'additive' || layer?.blend === 'normal' ? layer.blend : null;
+      const defaultBlend = typeName === 'halo' ? 'additive' : 'normal';
+      const blendMode = blendHint ?? defaultBlend;
+      const isAdditive = blendMode === 'additive';
       const opacity =
         ghost
           ? opacityBase * (isAdditive ? 0.6 : 0.74)
           : isAdditive
             ? opacityBase * 0.34
             : opacityBase;
+      const useCloudNoiseMask = typeName === 'cloud' && layer?.noiseMask === true;
       const sphereMaterial =
         typeName === 'core'
           ? new THREE.MeshPhysicalMaterial({
@@ -401,7 +447,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
             })
           : new THREE.MeshBasicMaterial({
               color: colorValue,
-              ...(typeName === 'cloud' ? { alphaMap: roughnessMap } : {}),
+              ...(useCloudNoiseMask ? { alphaMap: roughnessMap } : {}),
               transparent: true,
               opacity,
               depthWrite: false,
@@ -411,6 +457,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
         new THREE.SphereGeometry(layerRadius, typeName === 'nucleus' ? 18 : 28, typeName === 'nucleus' ? 14 : 22),
         sphereMaterial,
       );
+      sphere.renderOrder = index * 10;
       root.add(sphere);
       if (typeName === 'core') {
         sphere.castShadow = !ghost;
@@ -444,6 +491,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
             blending: THREE.AdditiveBlending,
           }),
         );
+        glow.renderOrder = index * 10 + 5;
         root.add(glow);
       }
     }
@@ -471,12 +519,10 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
       ? visual.nucleusColor
       : protonColor.clone().lerp(neutronColor, 0.48),
   );
-  const cloudColor = new THREE.Color(
-    Number.isFinite(visual.electronColor) ? visual.electronColor : colorBase.clone().offsetHSL(0, 0.02, 0.2),
-  );
+  const cloudColor = new THREE.Color(primaryChroma);
   const cloudScale = Math.max(visual.cloudScale ?? 1, 0.01);
-  const shellColor = new THREE.Color(Number.isFinite(visual.shellColor) ? visual.shellColor : cloudColor);
-  const haloColor = new THREE.Color(Number.isFinite(visual.haloColor) ? visual.haloColor : cloudColor);
+  const shellColor = new THREE.Color(primaryChroma);
+  const haloColor = new THREE.Color(primaryChroma);
   const usedLayeredAtom = buildLayeredAtom();
 
   const nucleus = new THREE.Mesh(
@@ -520,11 +566,10 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     new THREE.SphereGeometry(radius * cloudScale, 20, 16),
     new THREE.MeshBasicMaterial({
       color: cloudColor,
-      alphaMap: roughnessMap,
       transparent: true,
       opacity: ghost ? cloudOpacity * 0.6 : cloudOpacity,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
     }),
   );
   if (!usedLayeredAtom) {
@@ -740,6 +785,7 @@ function createAtomVisual(type, radius, { ghost = false } = {}) {
     rotationTarget = ball;
     glowTarget = ball;
   }
+
   return {
     root,
     rotationTarget: rotationTarget ?? ball,

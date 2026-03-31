@@ -12,7 +12,17 @@ export const ATOM_FX_DEFAULTS = {
   trailDensity: 1,
   dropletDensity: 1,
   bondLinkIntensity: 1,
+  /** Persistent vertical aim line while aiming (scene FX amount). */
   dropTrailDensity: 1,
+  dropSightWobble: 0,
+  dropSightFlow: 0.45,
+  dropSightDashDensity: 1,
+  dropSightSize: 1,
+  /** -1 = use next ball color */
+  dropSightColorCore: -1,
+  /** -1 = auto from core */
+  dropSightColorGlow: -1,
+  dropSightAimSnap: 2.2,
 };
 export const ATOM_FX_PRIMITIVE_TYPES = [
   'burst',
@@ -331,7 +341,7 @@ export const ATOM_FX_PROFILE_DEFAULTS = {
     stack: ['burst_clean', 'sparks_clean', 'smoke_soft', 'trails_lite', 'explosion_clean'],
   },
 };
-export const ATOM_VISUAL_LAYER_TYPES = ['core', 'nucleus', 'cloud', 'shell', 'halo'];
+export const ATOM_VISUAL_LAYER_TYPES = ['core', 'outline', 'nucleus', 'cloud', 'shell', 'halo'];
 
 function defaultLayerTemplate() {
   return [
@@ -561,6 +571,10 @@ function sanitizeLayerEntry(layer, fallbackId = '') {
   const type = sanitizeLayerType(layer.type);
   if (!type) return null;
   const color = sanitizeColor(layer.color);
+  const blendRaw = sanitizeText(String(layer.blend ?? ''), 12)?.toLowerCase();
+  const blendCandidate = blendRaw === 'additive' || blendRaw === 'normal' ? blendRaw : null;
+  const blend =
+    blendCandidate && (type === 'cloud' || type === 'halo') ? blendCandidate : null;
   const out = {
     id: sanitizeText(String(layer.id ?? fallbackId), 48) ?? `${type}_${Math.random().toString(36).slice(2, 8)}`,
     type,
@@ -576,6 +590,8 @@ function sanitizeLayerEntry(layer, fallbackId = '') {
     tiltPct: clamp(Number(layer.tiltPct ?? 50) || 0, 0, 100),
   };
   if (color != null) out.color = color;
+  if (blend) out.blend = blend;
+  if (type === 'cloud' && layer.noiseMask === true) out.noiseMask = true;
   return out;
 }
 
@@ -769,6 +785,19 @@ function sanitizeFxConfig(value) {
     if (n == null) return ATOM_FX_DEFAULTS[key];
     return clamp(n, 0, 2.2);
   };
+  const readColorOpt = (key) => {
+    const n = toFiniteNumber(src[key]);
+    if (n == null) return ATOM_FX_DEFAULTS[key];
+    if (n < 0) return -1;
+    return (Math.floor(n) >>> 0) & 0xffffff;
+  };
+  const readDashDensity = () => {
+    const v = toFiniteNumber(src.dropSightDashDensity);
+    if (v != null) return clamp(v, 0, 2.2);
+    const old = toFiniteNumber(src.dropSightDash);
+    if (old != null) return clamp(0.15 + (2.2 - old) * 0.9, 0, 2.2);
+    return ATOM_FX_DEFAULTS.dropSightDashDensity;
+  };
   return {
     ambientDensity: read('ambientDensity'),
     sparkDensity: read('sparkDensity'),
@@ -776,6 +805,13 @@ function sanitizeFxConfig(value) {
     dropletDensity: read('dropletDensity'),
     bondLinkIntensity: read('bondLinkIntensity'),
     dropTrailDensity: read('dropTrailDensity'),
+    dropSightWobble: read('dropSightWobble'),
+    dropSightFlow: read('dropSightFlow'),
+    dropSightDashDensity: readDashDensity(),
+    dropSightSize: read('dropSightSize'),
+    dropSightColorCore: readColorOpt('dropSightColorCore'),
+    dropSightColorGlow: readColorOpt('dropSightColorGlow'),
+    dropSightAimSnap: read('dropSightAimSnap'),
   };
 }
 
@@ -789,12 +825,15 @@ function buildEffectiveLayerStack(globalTemplate = [], atomLayers = []) {
   if (atomStack.length <= 0) return globalStack;
   if (globalStack.length <= 0) return atomStack;
 
-  const merged = [...globalStack];
-  for (const layer of atomStack) {
+  // Atom stack is authoritative: keep full order, including multiple layers of the same type.
+  const merged = [...atomStack];
+  const typesInAtom = new Set(
+    atomStack.map((l) => String(l?.type ?? '').toLowerCase()).filter(Boolean),
+  );
+  for (const layer of globalStack) {
     const type = String(layer?.type ?? '').toLowerCase();
-    const existingIndex = merged.findIndex((entry) => String(entry?.type ?? '').toLowerCase() === type);
-    if (existingIndex >= 0) merged[existingIndex] = layer;
-    else merged.push(layer);
+    if (!type || typesInAtom.has(type)) continue;
+    merged.push(cloneLayer(layer));
   }
   return merged;
 }
@@ -918,6 +957,17 @@ export function saveAtomVisualLabState(state) {
     localStorage.setItem(ATOM_VISUAL_LAB_LS_KEY, JSON.stringify(clean));
   } catch {}
   return clean;
+}
+
+/**
+ * Single resolved element spec for one Z, matching in-game `applyAtomVisualOverrides` output.
+ * Use in Atom Lab previews so the configurator matches gameplay before save.
+ */
+export function resolveAtomSpecForVisualState(atomicNumber, state) {
+  const clean = sanitizeAtomVisualLabState(state ?? {});
+  const effective = applyAtomVisualOverrides(ATOM_ELEMENTS, clean);
+  const z = Number(atomicNumber);
+  return effective.find((s) => Number(s?.atomicNumber) === z) ?? null;
 }
 
 export function applyAtomVisualOverrides(elements, state = loadAtomVisualLabState()) {

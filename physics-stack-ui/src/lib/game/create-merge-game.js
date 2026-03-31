@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { createPhysicsWorld, physicsTuning, applyPhysicsPreset } from './physics.js';
 import { attachSceneBackground, createRendererAndCamera, addDefaultLights, aimKeyLightAt } from './render.js';
+import { syncHudRowToPlayfieldX } from './hud-playfield-align.js';
 import { applyStudioEnvironment } from './environment.js';
 import { createOrthoViewportLayout } from './viewport-ortho.js';
 import { worldXFromPointer } from './merge-pointer.js';
@@ -146,6 +147,11 @@ export function createMergeGame(opts) {
   let atomFxPreviewChannel = null;
   let atomVisualLabStateCache = null;
 
+  /** Atoms: pass resolved `FRUITS[type]` into `createVisual` so mesh matches lab config (layers/colors). */
+  function atomVisualOpts(type) {
+    return mode === 'atoms' && FRUITS[type] ? { spec: FRUITS[type] } : {};
+  }
+
   function applyDeviceAtomPhysicsCaps() {
     physicsTuning.solverIterations = Math.min(physicsTuning.solverIterations, lowPerfDevice ? 72 : 96);
     physicsTuning.contactStiffness6 = Math.min(physicsTuning.contactStiffness6, lowPerfDevice ? 980 : 1200);
@@ -266,8 +272,6 @@ export function createMergeGame(opts) {
 
   let CUP = { ...CUP_BASE, wallH: 11 };
   let DROP_CENTER_Y = CUP.wallH - 0.55;
-  /** World Y of the queue strip row (updated in {@link layoutQueuePreviewMeshes}). */
-  let queueStripRowY = DROP_CENTER_Y - 0.9;
   let GAME_OVER_Y = CUP.wallH - GAME_OVER_BELOW_RIM;
 
   const listeners = [];
@@ -329,6 +333,9 @@ export function createMergeGame(opts) {
     playfieldBackgroundUrl: backgroundFx?.getCurrentImageUrl?.() ?? '',
   });
 
+  const shell = host?.closest?.('.game-shell') ?? null;
+  const topControlsEl = shell?.querySelector?.('.top-controls') ?? null;
+
   const queuePreviewGroup = new THREE.Group();
   queuePreviewGroup.renderOrder = 14;
   scene.add(queuePreviewGroup);
@@ -381,7 +388,7 @@ export function createMergeGame(opts) {
     const quat = entry.body.quaternion.clone();
     const oldRoot = entry.root;
     const oldDispose = entry.dispose;
-    const visual = modeSpec.createVisual(entry.type, drawRadius, {});
+    const visual = modeSpec.createVisual(entry.type, drawRadius, atomVisualOpts(entry.type));
     scene.add(visual.root);
     visual.root.position.copy(position);
     visual.rotationTarget.quaternion.copy(quat);
@@ -580,7 +587,13 @@ export function createMergeGame(opts) {
   }
 
   function collisionRadiusForType(type) {
-    const base = FRUITS[type]?.physicsRadius ?? FRUITS[type]?.radius ?? 0;
+    const spec = FRUITS[type];
+    if (!spec) return 0;
+    // Atoms: `radius` is globally scaled in the lab; `physicsRadius` stays unscaled (used for mass).
+    // Collision must follow `radius` or spheres look larger than their physics hull and overlap visually.
+    const base =
+      mode === 'atoms' ? Number(spec.radius) : Number(spec.physicsRadius ?? spec.radius) || 0;
+    if (!Number.isFinite(base) || base <= 0) return 0;
     if (mode !== 'atoms') return base;
     return base * ATOM_COLLISION_SCALE;
   }
@@ -588,9 +601,10 @@ export function createMergeGame(opts) {
   function massSpecForType(type) {
     const spec = FRUITS[type];
     if (!spec || mode !== 'atoms') return spec;
-    const physicsRadius = Number(spec.physicsRadius);
-    if (!Number.isFinite(physicsRadius) || physicsRadius <= 0) return spec;
-    return { ...spec, radius: physicsRadius };
+    /** Match `spec.radius` (global lab scale + collision) so mass/inertia align with the sphere shape. */
+    const r = Number(spec.radius);
+    if (!Number.isFinite(r) || r <= 0) return spec;
+    return { ...spec, radius: r };
   }
 
   function collisionRadiusForFruit(fruit) {
@@ -1373,8 +1387,13 @@ export function createMergeGame(opts) {
             const upScale = balancedPreset ? 0.1 : 0.3;
             a.body.velocity.x *= sideDamp;
             b.body.velocity.x *= sideDamp;
-            a.body.velocity.y = Math.min(upCap, Math.max(0, a.body.velocity.y * upScale));
-            b.body.velocity.y = Math.min(upCap, Math.max(0, b.body.velocity.y * upScale));
+            /** Don't kill downward velocity while still falling through overlap (big scaled atoms were "sticking"). */
+            function clampBottomPairVy(vy) {
+              if (vy < -0.1) return Math.max(vy * 0.62, -0.55);
+              return Math.min(upCap, Math.max(0, vy * upScale));
+            }
+            a.body.velocity.y = clampBottomPairVy(a.body.velocity.y);
+            b.body.velocity.y = clampBottomPairVy(b.body.velocity.y);
           }
 
           separated = true;
@@ -1411,7 +1430,8 @@ export function createMergeGame(opts) {
 
     const baseNeed = balancedPreset ? 5 : 9;
     const nearBasePad = balancedPreset ? 0.66 : 0.34;
-    const vyGate = balancedPreset ? 0.3 : 0.05;
+    /** Large collision radii (global atom scale) slow-settle at |vy| ~0.2–0.4 — keep gate above that band. */
+    const vyGate = balancedPreset ? 0.52 : 0.05;
     const vxGate = balancedPreset ? 0.32 : 0.07;
     const sleepV2 = balancedPreset ? 0.05 : 0.0035;
     const sleepW2 = balancedPreset ? 0.85 : 0.035;
@@ -1472,7 +1492,11 @@ export function createMergeGame(opts) {
 
     for (const fruit of fruits) {
       const r = collisionRadiusForFruit(fruit);
-      if (fruit.body.position.y > r + 0.78) continue;
+      const y = fruit.body.position.y;
+      const surfaceY = y - r;
+      // Only damp when the sphere is truly near the floor and nearly static (large r + global scale were tripping this while falling).
+      if (surfaceY > 0.24) continue;
+      if (Math.abs(fruit.body.velocity.y) > 0.78) continue;
 
       fruit.body.velocity.x *= 0.68;
       fruit.body.velocity.y *= 0.74;
@@ -1514,7 +1538,7 @@ export function createMergeGame(opts) {
     const drawRadius = spec.radius;
     const collisionRadius = collisionRadiusForType(type);
     const clamped = playfield.clampDropXZ(x, z, collisionRadius);
-    const visual = modeSpec.createVisual(type, drawRadius, {});
+    const visual = modeSpec.createVisual(type, drawRadius, atomVisualOpts(type));
     const atomMassScale = mode === 'atoms' && usesCalmAtomPreset() ? 0.42 : 0.62;
     const body = new CANNON.Body({
       mass: massForFruitSpec(massSpecForType(type)) * (mode === 'atoms' ? atomMassScale : 1),
@@ -1744,7 +1768,10 @@ export function createMergeGame(opts) {
     const parts = [];
     for (let i = 0; i < selectedTypes.length; i += 1) {
       const type = selectedTypes[i];
-      const visual = modeSpec.createVisual(type, FRUITS[type].radius * atomScale, { ghost: true });
+      const visual = modeSpec.createVisual(type, FRUITS[type].radius * atomScale, {
+        ghost: true,
+        ...atomVisualOpts(type),
+      });
       const a = (Math.PI * 2 * i) / selectedTypes.length;
       const jitter = (Math.random() - 0.5) * 0.04;
       const local = new THREE.Vector3(
@@ -1904,6 +1931,7 @@ export function createMergeGame(opts) {
     const ghostPreview = mode === 'atoms' ? false : previewIndex === 0;
     const visual = modeSpec.createVisual(type, FRUITS[type].radius * scale, {
       ghost: ghostPreview,
+      ...atomVisualOpts(type),
     });
     queuePreviewGroup.add(visual.root);
     queuePreviewEntries[previewIndex] = { ...visual, type };
@@ -1958,7 +1986,6 @@ export function createMergeGame(opts) {
     const yRowByCup = CUP.wallH - radiusMax - rimInset;
     const yRowByDropLane = DROP_CENTER_Y - radiusMax * 0.32 - laneInset;
     const yRow = Math.min(yRowByFrustum, yRowByCup, yRowByDropLane);
-    queueStripRowY = yRow;
     let cursor = innerLeft + 0.18;
     for (let i = QUEUE_STRIP_VISIBLE; i >= 1; i -= 1) {
       const entry = queuePreviewEntries[i];
@@ -1974,6 +2001,7 @@ export function createMergeGame(opts) {
     if (!fromPos || !toPos || !Number.isFinite(type)) return;
     const visual = modeSpec.createVisual(type, FRUITS[type].radius, {
       ghost: mode === 'atoms' ? false : true,
+      ...atomVisualOpts(type),
     });
     visual.root.position.copy(fromPos);
     visual.root.scale.setScalar(Math.max(0.34, QUEUE_PREVIEW_SCALE));
@@ -1984,7 +2012,7 @@ export function createMergeGame(opts) {
       from: fromPos.clone(),
       to: toPos.clone(),
       t: 0,
-      dur: 0.17,
+      dur: 0.072,
     });
   }
 
@@ -1993,7 +2021,7 @@ export function createMergeGame(opts) {
       const entry = queueSweepEntries[i];
       entry.t += dt;
       const u = Math.min(1, entry.t / entry.dur);
-      const eased = 1 - (1 - u) * (1 - u) * (1 - u);
+      const eased = u;
       entry.root.position.lerpVectors(entry.from, entry.to, eased);
       const sweepScale = QUEUE_PREVIEW_SCALE + (1 - QUEUE_PREVIEW_SCALE) * eased;
       entry.root.scale.setScalar(sweepScale);
@@ -2025,7 +2053,6 @@ export function createMergeGame(opts) {
     if (now - lastDropTime < DROP_COOLDOWN_MS) return;
     lastDropTime = now;
     settlePileBeforeDrop();
-    layoutQueuePreviewMeshes();
     const queuedNext = dropQueue[1];
     const queuedNextPos = queuePreviewEntries[1]?.root.position.clone() ?? null;
     const type = pendingDropType();
@@ -2033,10 +2060,6 @@ export function createMergeGame(opts) {
     spawnFruit(type, clamped.x, DROP_CENTER_Y, ROW_Z);
     const last = fruits[fruits.length - 1];
     last.body.velocity.set(0, -effectiveDropVy(), 0);
-    const dropTint = Number(FRUITS[type]?.color) || 0x9edcff;
-    juice.addDropGuideTrail?.(clamped.x, DROP_CENTER_Y, queueStripRowY, ROW_Z, dropTint, {
-      style: mode === 'atoms' ? 'full' : 'full',
-    });
     addScore(mode === 'atoms' ? 1 : 2);
     Sfx.playDrop();
     dropQueue.shift();
@@ -2165,7 +2188,8 @@ export function createMergeGame(opts) {
       MERGE_POINTS,
       MERGEABLE_TYPE_MAX,
       MERGE_DIST_MULT,
-      JACKPOT_MERGE_DIST_MULT,
+      // Disable "fusion jackpot" in atoms mode (no max-tier twin bonus).
+      JACKPOT_MERGE_DIST_MULT: mode === 'atoms' ? 0 : JACKPOT_MERGE_DIST_MULT,
       COMBO_CHAIN_SEC,
       physicsTuning,
       mergeComboMultBeforeBump,
@@ -2220,9 +2244,12 @@ export function createMergeGame(opts) {
       mergeResult: 'nextTier',
       vfxLevel: 'normal',
       jackpotFloatTier: (points) => modeSpec.jackpotText(points),
-      onJackpotTierExtra: () => {
-        onToast(t('game.jackpotMerge'), 'success', 'center');
-      },
+      onJackpotTierExtra:
+        mode === 'atoms'
+          ? null
+          : () => {
+              onToast(t('game.jackpotMerge'), 'success', 'center');
+            },
       onNormalMergeUi: (points, newType, nx, ny, spec) => {
         const baseMergeTextY = ny + spec.radius * 0.42;
         // Keep atom merge text readable above the pile, but avoid pinning it to mid/back-wall area.
@@ -2617,6 +2644,23 @@ export function createMergeGame(opts) {
     checkGameOver(dt);
     syncBackgroundSizeToCanvas();
     backgroundFx?.update?.(dt);
+    if (topControlsEl) {
+      syncHudRowToPlayfieldX({ camera, canvasEl, CUP, ROW_Z, rowEl: topControlsEl });
+    }
+    {
+      const aimType = pendingDropType();
+      const aimSpec = FRUITS[aimType];
+      const aimClamp = playfield.clampDropXZ(ghostPos.x, ROW_Z, collisionRadiusForType(aimType));
+      juice.updateDropAimSight?.({
+        active: !gameOver,
+        worldX: aimClamp.x,
+        yTop: DROP_CENTER_Y,
+        yBottom: 0.06,
+        worldZ: ROW_Z + 0.1,
+        color: aimSpec?.color ?? 0xe8f4ff,
+        dt,
+      });
+    }
     juice.updateParticles(dt);
     renderer.render(scene, camera);
     emitHud();

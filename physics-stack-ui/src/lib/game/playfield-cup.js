@@ -22,32 +22,37 @@ function loadPlayfieldBackdropImage(url) {
   });
 }
 
-function drawBackdropCover(ctx, img, width, height, alpha = 0.22, zoom = 1) {
+function drawBackdropCover(ctx, img, width, height, alpha = 0.22, zoom = 1, opts = {}) {
   if (!img) return;
-  const scale = Math.min(width / img.width, height / img.height) * zoom;
+  const { skipBaseFill = false, skipVignette = false, cover = false } = opts;
+  const scale = (cover ? Math.max(width / img.width, height / img.height) : Math.min(width / img.width, height / img.height)) * zoom;
   const drawW = img.width * scale;
   const drawH = img.height * scale;
   const x = (width - drawW) * 0.5;
   const y = (height - drawH) * 0.5;
   ctx.save();
-  ctx.fillStyle = '#050a11';
-  ctx.fillRect(0, 0, width, height);
+  if (!skipBaseFill) {
+    ctx.fillStyle = '#050a11';
+    ctx.fillRect(0, 0, width, height);
+  }
   ctx.globalAlpha = alpha;
   ctx.drawImage(img, x, y, drawW, drawH);
-  const vignette = ctx.createRadialGradient(
-    width * 0.5,
-    height * 0.5,
-    Math.min(width, height) * 0.32,
-    width * 0.5,
-    height * 0.5,
-    Math.max(width, height) * 0.75,
-  );
-  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vignette.addColorStop(0.64, 'rgba(0, 0, 0, 0.22)');
-  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.62)');
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, width, height);
+  if (!skipVignette) {
+    const vignette = ctx.createRadialGradient(
+      width * 0.5,
+      height * 0.5,
+      Math.min(width, height) * 0.32,
+      width * 0.5,
+      height * 0.5,
+      Math.max(width, height) * 0.75,
+    );
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(0.64, 'rgba(0, 0, 0, 0.22)');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.62)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+  }
   ctx.restore();
 }
 
@@ -91,12 +96,12 @@ export const PLAYFIELD_THEMES = {
     glassColor: 0xa8c0e8,
   },
   atoms: {
-    backGrad: ['#2d4a42', '#243838', '#1a2e28', '#14221c', '#0c1612'],
-    backRadial: 'rgba(120, 220, 180, 0.18)',
-    floorGrad: ['#4a7068', '#2d4540', '#1a2e28'],
-    zoneEmissive: 0x0a1814,
-    floorEmissive: 0x0a1410,
-    baseColor: 0x1a2824,
+    backGrad: ['#e4f4ef', '#cce8e0', '#b0d8cc', '#8fc4b4', '#6dab9a'],
+    backRadial: 'rgba(255, 255, 255, 0.12)',
+    floorGrad: ['#5a8074', '#3d5c54', '#2a4038'],
+    zoneEmissive: 0x102420,
+    floorEmissive: 0x0e1c18,
+    baseColor: 0x345648,
     glassColor: 0xa8e0d0,
   },
 };
@@ -148,7 +153,6 @@ export function createPlayfieldCup(opts) {
 
   let playfieldMaps = null;
   let activeBackdropUrl = typeof playfieldBackgroundUrl === 'string' ? playfieldBackgroundUrl : '';
-
   function repaintBackMap() {
     if (!playfieldMaps?.backCtx || !playfieldMaps?.backCanvas || !playfieldMaps?.backMap) return;
     const bx = playfieldMaps.backCtx;
@@ -157,6 +161,40 @@ export function createPlayfieldCup(opts) {
     const bh = cb.height;
 
     bx.clearRect(0, 0, bw, bh);
+
+    if (themeId === 'atoms') {
+      const gStops = theme.backGrad;
+      const vg = bx.createLinearGradient(0, 0, 0, bh);
+      const n = gStops.length - 1;
+      gStops.forEach((c, i) => vg.addColorStop(i / n, c));
+      bx.fillStyle = vg;
+      bx.fillRect(0, 0, bw, bh);
+      // Atoms: use the SAME background image, but blur it on the cup back wall
+      // so it doesn't read as a "second picture" inside the play area.
+      bx.save();
+      bx.filter = 'blur(10px) saturate(1.06)';
+      drawBackdropCover(bx, playfieldMaps.backdropImage, bw, bh, 0.98, 1.04, {
+        skipBaseFill: true,
+        skipVignette: true,
+        cover: true,
+      });
+      bx.restore();
+
+      // Gentle frosted wash to reduce detail further (keeps atoms readable).
+      bx.fillStyle = 'rgba(248, 255, 252, 0.18)';
+      bx.fillRect(0, 0, bw, bh);
+
+      // Bottom raccord: fade into the floor area so the seam reads softer.
+      const fadeH = Math.max(38, Math.floor(bh * 0.12));
+      const fade = bx.createLinearGradient(0, bh - fadeH, 0, bh);
+      fade.addColorStop(0, 'rgba(248, 255, 252, 0)');
+      fade.addColorStop(1, 'rgba(36, 64, 56, 0.22)');
+      bx.fillStyle = fade;
+      bx.fillRect(0, bh - fadeH, bw, fadeH);
+      playfieldMaps.backMap.needsUpdate = true;
+      return;
+    }
+
     const gStops = theme.backGrad;
     const vg = bx.createLinearGradient(0, 0, 0, bh);
     const n = gStops.length - 1;
@@ -360,26 +398,65 @@ export function createPlayfieldCup(opts) {
         depthWrite: false,
         envMapIntensity: 0.72,
       });
+    /** Slightly frosted sides so left/right rim reads clearly without a full front pane. */
+    const makeAtomsSideGlass = () =>
+      new THREE.MeshPhysicalMaterial({
+        color: 0xd8f4ec,
+        metalness: 0.02,
+        roughness: 0.2,
+        transmission: 0.4,
+        thickness: 0.2,
+        ior: 1.45,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        envMapIntensity: 0.58,
+      });
     const wallH = wh + 0.45;
     const wallWz = hz * 2 + 0.06;
-    const addWall = (x, ry) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(wallWz, wallH), makeWallGlass());
+    const addWall = (x, ry, matFn) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(wallWz, wallH), matFn());
       m.position.set(x, wallH * 0.48, 0);
       m.rotation.y = ry;
       m.receiveShadow = true;
       cupGroup.add(m);
     };
-    addWall(-innerX + 0.012, Math.PI / 2);
-    addWall(innerX - 0.012, -Math.PI / 2);
+    if (themeId === 'atoms') {
+      addWall(-innerX + 0.012, Math.PI / 2, makeAtomsSideGlass);
+      addWall(innerX - 0.012, -Math.PI / 2, makeAtomsSideGlass);
+    } else {
+      addWall(-innerX + 0.012, Math.PI / 2, makeWallGlass);
+      addWall(innerX - 0.012, -Math.PI / 2, makeWallGlass);
+    }
 
-    const frontWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(innerX * 2 - 0.04, wallH),
-      makeWallGlass(),
-    );
-    frontWall.position.set(0, wallH * 0.48, frontZ);
-    frontWall.rotation.y = Math.PI;
-    frontWall.receiveShadow = true;
-    cupGroup.add(frontWall);
+    // Atoms mode: keep the front face invisible so the glass doesn't wash/tint the atom visuals.
+    if (themeId !== 'atoms') {
+      const frontWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(innerX * 2 - 0.04, wallH),
+        makeWallGlass(),
+      );
+      frontWall.position.set(0, wallH * 0.48, frontZ);
+      frontWall.rotation.y = Math.PI;
+      frontWall.receiveShadow = true;
+      cupGroup.add(frontWall);
+    }
+
+    // Atoms: front lip so the bottom “tray” edge reads next to the open front.
+    if (themeId === 'atoms') {
+      const lipD = 0.075;
+      const lipMat = new THREE.MeshStandardMaterial({
+        color: 0x3a6258,
+        roughness: 0.78,
+        metalness: 0.12,
+        envMapIntensity: 0.42,
+      });
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(innerX * 2 - 0.05, 0.09, lipD), lipMat);
+      lip.position.set(0, 0.048, frontZ - lipD * 0.48);
+      lip.castShadow = true;
+      lip.receiveShadow = true;
+      cupGroup.add(lip);
+    }
 
     const lineMat = new THREE.MeshBasicMaterial({
       color: 0xff5566,
@@ -392,6 +469,7 @@ export function createPlayfieldCup(opts) {
     dangerLine.rotation.x = -Math.PI / 2;
     dangerLine.position.set(0, getGameOverY() + 0.01, ROW_Z + 0.02);
     cupGroup.add(dangerLine);
+
   }
 
   function clearStaticPhysics() {

@@ -32,6 +32,7 @@ export function mountMoleculeMiniPreview(host, initialPayload) {
       atoms: Array.isArray(payload?.atoms) ? payload.atoms : [],
       detail: 'card',
       locked: false,
+      visualState: payload?.visualState ?? null,
     });
     if (current?.group) {
       cluster.remove(current.group);

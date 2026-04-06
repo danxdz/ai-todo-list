@@ -82,6 +82,8 @@ All todos are automatically saved to your browser's localStorage, so your todos 
 
 This project was created by AI and is open for contributions. Feel free to submit issues or pull requests.
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/danxdz/ai-todo-list?utm_source=oss&utm_medium=github&utm_campaign=danxdz%2Fai-todo-list&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 ## License
 
 This project is open source and available under the [MIT License](LICENSE).
